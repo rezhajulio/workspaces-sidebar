@@ -1,7 +1,7 @@
 schema = 1
 id = "workspaces-sidebar"
 name = "Workspaces Sidebar"
-version = "0.1.0"
+version = "0.1.1"
 description = "Sidebar listing sessions (workspaces) and their tabs; click to switch."
 icon = "sidebar"
 window = "window.luau"
