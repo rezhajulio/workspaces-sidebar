@@ -7,11 +7,11 @@ local layout_mod = require("./layout")
 
 local view_mod = {}
 
-view_mod.TAB_COLORS: { TabColor } = {
+local TAB_COLORS: { TabColor } = {
 	"blue", "green", "yellow", "orange", "red", "purple", "teal", "pink"
 }
 
-view_mod.COLOR_LABELS: { [string]: { glyph: string, tone: string } } = {
+local COLOR_LABELS: { [string]: { glyph: string, tone: string } } = {
 	blue = { glyph = "🔵", tone = "accent" },
 	green = { glyph = "🟢", tone = "accent" },
 	yellow = { glyph = "🟡", tone = "warn" },
@@ -26,10 +26,10 @@ function view_mod.next_tab_color(cur: TabColor?): TabColor?
 	if not cur then
 		return "blue"
 	end
-	for i, c in view_mod.TAB_COLORS do
+	for i, c in TAB_COLORS do
 		if c == cur then
-			if i < #view_mod.TAB_COLORS then
-				return view_mod.TAB_COLORS[i + 1]
+			if i < #TAB_COLORS then
+				return TAB_COLORS[i + 1]
 			else
 				return nil
 			end
@@ -200,7 +200,7 @@ function view_mod.build(cx: WindowCx): Node
 				local dot_glyph = if is_active then "● " else "○ "
 
 				local effective_color = t.color or tern.kv.get("tab_color_" .. t.id)
-				local color_info = if effective_color then view_mod.COLOR_LABELS[effective_color] else nil
+				local color_info = if effective_color then COLOR_LABELS[effective_color] else nil
 
 				local display_name = format.tab_display_name(t, cx)
 
