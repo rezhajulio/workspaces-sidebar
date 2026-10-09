@@ -4,6 +4,8 @@ A pinned workspaces sidebar for [Tern](https://stencil.so/tern), Stencil's Rust-
 
 If you keep several agents and long-running commands going across sessions, you know the problem. You can't see which tab is waiting on you without cycling through all of them. This plugin fixes that.
 
+![Workspaces sidebar in action](docs/demo.png)
+
 ## What you get
 
 A native canvas pane on the left of every tab. It lists your sessions as workspaces, with each session's tabs nested underneath. Each tab shows a live status badge:
