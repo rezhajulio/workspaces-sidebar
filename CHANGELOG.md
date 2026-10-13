@@ -14,6 +14,14 @@ and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
   - Enable `split_down` below the workspace header/action controls without poll eviction.
   - Preserve dragged panes placed beneath the sidebar canvas.
 
+## [0.1.2] - 2026-10-09
+
+### Documentation
+- **docs**: add project `CHANGELOG.md` adhering to Keep a Changelog and Conventional Commits
+
+### Maintenance
+- **release**: bump version to `0.1.2`
+
 ## [0.1.1] - 2026-10-09
 
 ### Bug Fixes
