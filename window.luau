@@ -16,6 +16,7 @@ local opening = false
 local last_fp: string?
 local tab_opening_times: { [number]: number } = {}
 
+
 local function mine(cx: WindowCx): { number }
 	return model.mine(cx)
 end
@@ -247,7 +248,6 @@ tern.command({
 	title = "Workspaces: rename workspace",
 	icon = "pencil",
 	run = function(cx)
-		start_fast_poll()
 		cx:command("rename_session")
 	end,
 })
@@ -562,7 +562,6 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 		if cx.sessions:current().id ~= n then
 			cx.sessions:switch(n)
 		end
-		start_fast_poll()
 		cx:command("rename_session")
 	elseif kind == "close" and n then
 		for _, s in cx.sessions:list() do
@@ -618,20 +617,10 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 	return true
 end)
 
-local fast_poll_ticks = 0
-
-local function start_fast_poll()
-	fast_poll_ticks = 40
-end
 
 -- Single cache lifetime per poll cycle; caches invalidated on any mutation
 local function poll(cx: WindowCx?)
-	local interval = 100
-	if fast_poll_ticks > 0 then
-		fast_poll_ticks -= 1
-		interval = 50
-	end
-	tern.timer(interval, poll)
+	tern.timer(200, poll)
 	if cx then
 		model.invalidate() -- fresh read at cycle start
 		pcall(model.auto_close_empty_tabs, cx)
@@ -649,7 +638,7 @@ local function poll(cx: WindowCx?)
 	end
 end
 
-tern.timer(50, poll)
+tern.timer(100, poll)
 -- Prevent sidebar canvas from splitting horizontally; redirect split to main terminal
 tern.override("split_right", function(cx: WindowCx): boolean?
 	local focused = cx.session:focused()
