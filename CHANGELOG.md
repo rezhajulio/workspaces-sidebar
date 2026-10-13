@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.1.4] - 2026-10-13
+
+### Bug Fixes
+- **events**: subscribe to `cwd`, `title`, `command_started`, and `command_finished` lifecycle events so shell directory changes, title updates, and command status markers redraw instantly
+- **view**: fingerprint `format.tab_display_name` directly instead of short-circuiting on non-empty terminal title, ensuring path updates trigger canvas redraws
+- **format**: resolve fallback working directory from pane info when tab pane points to an uninitialized block
+- **rename**: activate high-frequency 50ms polling burst on workspace rename actions and commands to immediately reflect the new name upon submission
+
 ## [0.1.3] - 2026-10-13
 
 ### Features

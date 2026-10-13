@@ -105,7 +105,9 @@ function format.tab_display_name(t: TabInfo, cx: WindowCx): string
 		return format.truncate(t.title, 22)
 	end
 	-- Shell terminal tab: format working directory
-	return format.path(t.cwd or t.title)
+	local cwd = if t.cwd and t.cwd ~= "" then t.cwd else (if pinfo and pinfo.cwd and pinfo.cwd ~= "" then pinfo.cwd else nil)
+	local title = if t.title and t.title ~= "" then t.title else (if pinfo and pinfo.title and pinfo.title ~= "" then pinfo.title else nil)
+	return format.path(cwd or title)
 end
 
 return format

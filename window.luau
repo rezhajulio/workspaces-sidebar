@@ -247,6 +247,7 @@ tern.command({
 	title = "Workspaces: rename workspace",
 	icon = "pencil",
 	run = function(cx)
+		start_fast_poll()
 		cx:command("rename_session")
 	end,
 })
@@ -561,6 +562,7 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 		if cx.sessions:current().id ~= n then
 			cx.sessions:switch(n)
 		end
+		start_fast_poll()
 		cx:command("rename_session")
 	elseif kind == "close" and n then
 		for _, s in cx.sessions:list() do
@@ -616,9 +618,20 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 	return true
 end)
 
+local fast_poll_ticks = 0
+
+local function start_fast_poll()
+	fast_poll_ticks = 40
+end
+
 -- Single cache lifetime per poll cycle; caches invalidated on any mutation
 local function poll(cx: WindowCx?)
-	tern.timer(250, poll)
+	local interval = 100
+	if fast_poll_ticks > 0 then
+		fast_poll_ticks -= 1
+		interval = 50
+	end
+	tern.timer(interval, poll)
 	if cx then
 		model.invalidate() -- fresh read at cycle start
 		pcall(model.auto_close_empty_tabs, cx)
@@ -636,8 +649,7 @@ local function poll(cx: WindowCx?)
 	end
 end
 
-tern.timer(100, poll)
-
+tern.timer(50, poll)
 -- Prevent sidebar canvas from splitting horizontally; redirect split to main terminal
 tern.override("split_right", function(cx: WindowCx): boolean?
 	local focused = cx.session:focused()
@@ -651,6 +663,30 @@ tern.override("split_right", function(cx: WindowCx): boolean?
 		return true
 	end
 	return nil
+end)
+
+tern.on("cwd", function(_ev: CwdEvent, cx: WindowCx)
+	last_fp = nil
+	model.invalidate()
+	pcall(refresh, cx)
+end)
+
+tern.on("title", function(_ev: TitleEvent, cx: WindowCx)
+	last_fp = nil
+	model.invalidate()
+	pcall(refresh, cx)
+end)
+
+tern.on("command_started", function(_ev: CommandStartedEvent, cx: WindowCx)
+	last_fp = nil
+	model.invalidate()
+	pcall(refresh, cx)
+end)
+
+tern.on("command_finished", function(_ev: CommandFinishedEvent, cx: WindowCx)
+	last_fp = nil
+	model.invalidate()
+	pcall(refresh, cx)
 end)
 
 tern.on("window_start", function(cx: WindowCx)

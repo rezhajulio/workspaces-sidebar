@@ -58,7 +58,8 @@ function view_mod.fingerprint(cx: WindowCx): string
 
 	for _, s in cx.sessions:list() do
 		local collapsed = model.is_session_collapsed(s.id, s.current)
-		table.insert(parts, s.id .. ":" .. (if s.current then "1" else "0") .. ":" .. (if s.locked then "L" else "U") .. ":" .. (if collapsed then "C" else "E") .. ":" .. s.name .. ":" .. s.tabs)
+		local ntabs = if type(s.tabs) == "table" then #s.tabs else tostring(s.tabs)
+		table.insert(parts, s.id .. ":" .. (if s.current then "1" else "0") .. ":" .. (if s.locked then "L" else "U") .. ":" .. (if collapsed then "C" else "E") .. ":" .. s.name .. ":" .. ntabs)
 	end
 	for _, t in tabs do
 		local tf = tab_flags[t.id]
@@ -67,7 +68,8 @@ function view_mod.fingerprint(cx: WindowCx): string
 			flag_str = (if tf.busy then "B" else "") .. (if tf.waiting then "W" else "") .. (if tf.alert then "A" else "")
 		end
 		local col = t.color or tern.kv.get("tab_color_" .. t.id) or ""
-		table.insert(parts, "t" .. t.id .. ":" .. col .. ":" .. flag_str .. ":" .. (t.name or t.title or t.cwd or ""))
+		local dname = format.tab_display_name(t, cx)
+		table.insert(parts, "t" .. t.id .. ":" .. col .. ":" .. flag_str .. ":" .. dname .. ":" .. (t.cwd or ""))
 	end
 	return table.concat(parts, "|")
 end
