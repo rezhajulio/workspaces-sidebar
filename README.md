@@ -45,9 +45,11 @@ To move a tab to another workspace, click its ⇥ badge. Every other badge hides
 
 The `+` on a workspace header opens a new tab in that workspace's directory. `+ Workspace` at the bottom creates a session named after your current folder and opens it there. If the name is taken, it dedups.
 
-`✕` closes a tab. Closing a whole workspace is guarded: lock it with the 🔒/🔓 toggle and it can't be closed by accident.
+To rename a workspace, click the `✎` icon on its header, or run `Workspaces: rename workspace` from the palette.
 
-Press Ctrl+D in a shell and the tab closes cleanly. Without this, you get an orphaned sidebar sitting alone in a dead tab. You can turn it off.
+`✕` closes a tab or an unlocked workspace. Accidental workspace closure is prevented by locking it with the 🔒/🔓 button.
+
+Press Ctrl+D in a shell and the tab closes cleanly. Without this, you get an orphaned sidebar sitting alone in a dead tab. Toggleable in settings.
 
 ### Layout and focus
 
@@ -55,8 +57,12 @@ The sidebar mounts itself on every tab. Drag the divider once and every tab foll
 
 Focus behaves. Clicking around the sidebar never leaves focus stranded on it, and switching tabs restores the terminal focus of the tab you're going to.
 
-Paths come in two styles. Smart shows the folder basename, or parent/basename for generic directories like `src`. Fish style shows `~/W/p/tern-sidebar`. Color tag labels can be shown or hidden.
+Splitting panes respects the sidebar:
+- **Split down (`Shift+Cmd+D`)**: When focused on the sidebar, splits downward into the empty space below the `+ Workspace` button. Perfect for pinning an agent, task manager, or log monitor under the rail.
+- **Split right (`Cmd+D`)**: When focused on the sidebar, automatically redirects to the active terminal pane instead of splitting the rail into narrow, unreadable slivers.
+- **Drag-and-drop**: You can drag any terminal or block into the area beneath the sidebar rail. It stays pinned there across tab polls.
 
+Paths come in two styles: **smart** (shows folder basename, or `parent/basename` for generic directories like `src`) and **fish** (abbreviates parents to single characters like `~/W/p/tern-sidebar`). Color tag labels can be shown or hidden.
 ## Install
 
 You need Tern (closed beta). From a git URL:
@@ -74,36 +80,55 @@ tern plugin reload
 
 ## Commands and keybindings
 
-| Action | Binding |
+Palette commands and keyboard shortcuts:
+
+| Command | Binding | Description |
+| --- | --- | --- |
+| `Workspaces: toggle sidebar` | `Cmd+Alt+Shift+B` | Show or hide the sidebar across all tabs |
+| `Workspaces: next needing attention` | `Cmd+Alt+Shift+A` | Jump to first tab with waiting agent, alert, or failed command |
+| `Workspaces: next` | `Cmd+Alt+Shift+]` | Step forward to the next workspace |
+| `Workspaces: previous` | `Cmd+Alt+Shift+[` | Step backward to the previous workspace |
+| `Workspaces: go to 1` … `9` | `Cmd+Alt+1` … `9` | Jump directly to workspace 1 through 9 |
+| `Workspaces: new` | — | Create and seed a new workspace from current directory |
+| `Workspaces: rename workspace` | — | Prompt to rename the active workspace |
+| `Workspaces: cycle active tab color` | — | Cycle through the 8 native tab colors on focused tab |
+| `Workspaces: toggle path style (smart / fish)` | — | Switch between smart basename and fish abbreviated paths |
+| `Workspaces: toggle color tags` | — | Show or hide colored dot indicators on tabs |
+| `Workspaces: toggle color tag labels` | — | Show or hide textual color names |
+| `Workspaces: toggle auto-close empty tabs` | — | Toggle whether Ctrl+D shell exit auto-closes the tab |
+| Cancel move mode | `Esc` | Exit tab move mode |
+
+Mouse actions on the sidebar:
+
+| Action | Target / Gesture |
 | --- | --- |
-| Workspaces: next needing attention | Cmd+Alt+Shift+A |
-| Jump to workspace 1 to 9 | Cmd+Alt+1 to 9 |
-| Toggle sidebar | Click the status line segment |
-| Cancel move mode | Esc |
+| Switch workspace | Click workspace name |
+| Jump to tab | Click tab row |
+| Fold / unfold workspace | Click chevron (▸ / ▾) |
+| Rename workspace | Click `✎` icon |
+| New tab in workspace cwd | Click `+` on workspace header |
+| New workspace from current cwd | Click `+ Workspace` at bottom of rail |
+| Close tab | Click `✕` on tab row |
+| Close workspace | Click `✕` on workspace header (unlocked only) |
+| Lock / unlock workspace | Click `🔒` / `🔓` icon |
+| Cycle tab color tag | Click the color indicator circle |
+| Move tab between workspaces | Click `⇥` badge, then click `Move here` on target |
+| Reorder tab in workspace | `Shift`-click row to move up, `Alt`-click to move down |
+| Toggle sidebar | Click the workspace name segment in the status line |
+| Stack block under rail | Press `Shift+Cmd+D` or drag block under the rail |
 
-Mouse actions:
+## Toggles and settings
 
-| Action | Gesture |
-| --- | --- |
-| Switch workspace | Click its name |
-| Jump to tab | Click the row |
-| Fold or unfold workspace | Click the chevron |
-| New tab in workspace directory | `+` on the header |
-| New workspace from current folder | `+ Workspace` at the bottom |
-| Close tab | `✕` |
-| Lock or unlock workspace | 🔒/🔓 |
-| Cycle tab color | Click the color badge |
-| Move tab to another workspace | ⇥ badge, then "Move here" |
-| Move tab up or down | Shift-click or alt-click the row |
+Settings are persisted across Tern restarts via `tern.kv`:
 
-## Toggles
-
-| Toggle | Options |
-| --- | --- |
-| Tab color tags | On or off |
-| Color tag labels | Shown or hidden |
-| Path display | Smart or fish style |
-| Close tab on Ctrl+D | On or off |
+| Setting | Default | Description |
+| --- | --- | --- |
+| `path_style` | `"smart"` | Directory formatting: `"smart"` vs `"fish"` |
+| `color_tags_enabled` | `true` | Show or hide color tags on tabs |
+| `color_labels_enabled` | `false` | Show textual color tag labels beside glyphs |
+| `auto_close_empty_tabs` | `true` | Auto-close orphaned tab when shell exits (Ctrl+D) |
+| `pinned` | `true` | Pinned sidebar rail visibility |
+| `sidebar_ratio` | dynamic | Divider width ratio, synced across tabs on drag |
 
 ## How it works, and what it can't do
 
