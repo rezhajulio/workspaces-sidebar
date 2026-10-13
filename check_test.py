@@ -48,4 +48,29 @@ assert m is not None
 assert m.group(1) == "filter"
 assert m.group(2) == "busy"
 
+# Verify is_in_left_rail tree search logic
+def is_in_left_rail(tree, pane):
+    if not tree:
+        return False
+    if tree.get("pane") == pane:
+        return True
+    left = tree.get(1) or tree.get("1")
+    if not left:
+        return False
+    def scan(t):
+        if not t:
+            return False
+        if t.get("pane") == pane:
+            return True
+        return scan(t.get(1) or t.get("1")) or scan(t.get(2) or t.get("2"))
+    return scan(left)
+
+sb = 100
+assert is_in_left_rail({"pane": sb}, sb)  # bare leaf
+assert is_in_left_rail({"1": {"pane": sb}, "2": {"pane": 200}}, sb)  # normal left rail
+assert is_in_left_rail({"1": {"1": {"pane": sb}, "2": {"pane": 300}}, "2": {"pane": 200}}, sb)  # block under sidebar
+assert is_in_left_rail({"1": {"1": {"pane": 300}, "2": {"pane": sb}}, "2": {"pane": 200}}, sb)  # block above sidebar
+assert not is_in_left_rail({"1": {"pane": 200}, "2": {"pane": sb}}, sb)  # displaced: sidebar in root[2]
+assert not is_in_left_rail({"1": {"pane": 200}, "2": {"1": {"pane": sb}, "2": {"pane": 300}}}, sb)  # displaced deep
+
 print("ok")

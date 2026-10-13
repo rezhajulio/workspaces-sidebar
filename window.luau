@@ -108,8 +108,8 @@ local function ensure_pinned(cx: WindowCx)
 		elseif pane then
 			local l = cx.session:layout(active_tab)
 			if l and l.root and l.root.ratio then
-				-- Reposition sidebar to left if not already there
-				if l.root[1] and not model.is_mine(cx, l.root[1].pane or 0) then
+				-- Reposition sidebar to left if not already in the left rail
+				if not layout_mod.is_in_left_rail(l.root, pane) then
 					local target = layout_mod.find_tab_terminal(cx, model.is_mine, active_tab)
 					if target then
 						cx.layout:move(pane, target, "left", { focus = false })
@@ -638,6 +638,21 @@ end
 
 tern.timer(100, poll)
 
+-- Prevent sidebar canvas from splitting horizontally; redirect split to main terminal
+tern.override("split_right", function(cx: WindowCx): boolean?
+	local focused = cx.session:focused()
+	if focused and model.is_mine(cx, focused) then
+		local active_tab = cx.session:tab_of(focused)
+		local term = if active_tab then layout_mod.find_tab_terminal(cx, model.is_mine, active_tab) else nil
+		if term then
+			cx.layout:focus(term)
+			cx.layout:split(term, "right", nil, { focus = true })
+		end
+		return true
+	end
+	return nil
+end)
+
 tern.on("window_start", function(cx: WindowCx)
 	last_fp = nil
 	model.invalidate()
@@ -670,9 +685,9 @@ tern.on("focus", function(ev: any, cx: WindowCx)
 	local tab_id = ev and ev.tab
 	if tab_id then
 		local l = cx.session:layout(tab_id)
-		if l and l.root and l.root[1] and l.root.ratio then
-			local p = l.root[1].pane
-			if p and model.is_mine(cx, p) then
+		local has_sb, sb_pane = model.tab_has_sidebar(cx, tab_id)
+		if l and l.root and l.root.ratio and has_sb and sb_pane then
+			if layout_mod.is_in_left_rail(l.root, sb_pane) then
 				local cur_r = l.root.ratio
 				local prev_known = layout_mod.known_ratio(tab_id)
 				if prev_known and math.abs(cur_r - prev_known) > 0.015 and cur_r >= 0.05 and cur_r <= 0.60 then

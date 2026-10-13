@@ -6,13 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
-## [Unreleased]
+## [0.1.3] - 2026-10-13
 
-### Planned
-- Layout and split pane integration:
-  - Guard `split_right` against horizontal distortion of the pinned sidebar rail.
-  - Enable `split_down` below the workspace header/action controls without poll eviction.
-  - Preserve dragged panes placed beneath the sidebar canvas.
+### Features
+- **layout**: support vertical splits (`split_down`) and dragged blocks underneath the pinned sidebar rail
+- **layout**: guard `split_right` on the sidebar canvas; redirect horizontal splits to the active terminal pane to prevent narrow rail corruption
+
+### Bug Fixes
+- **layout**: replace single-leaf `root[1].pane` check with `layout_mod.is_in_left_rail` so stacked blocks in the left rail survive poll cycles
+- **focus**: preserve divider ratio tracking when the left rail contains multiple stacked panes
 
 ## [0.1.2] - 2026-10-09
 

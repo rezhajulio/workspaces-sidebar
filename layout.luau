@@ -80,6 +80,30 @@ function layout_mod.set_known_ratio(tab_id: number, ratio: number)
 	tab_known_ratios[tab_id] = ratio
 end
 
+-- True if pane is in the tab's left rail (root[1]), either alone or stacked with other blocks
+function layout_mod.is_in_left_rail(tree: TabTree?, pane: number): boolean
+	if not tree then
+		return false
+	end
+	if tree.pane == pane then
+		return true
+	end
+	local left = tree[1]
+	if not left then
+		return false
+	end
+	local function scan(t: TabTree?): boolean
+		if not t then
+			return false
+		end
+		if t.pane == pane then
+			return true
+		end
+		return scan(t[1]) or scan(t[2])
+	end
+	return scan(left)
+end
+
 -- The tab's non-sidebar pane (terminal/agent/file); nil when the tab is sidebar-only
 function layout_mod.find_tab_terminal(cx: WindowCx, is_mine: (WindowCx, number) -> boolean, tab_id: number): number?
 	local l = cx.session:layout(tab_id)
