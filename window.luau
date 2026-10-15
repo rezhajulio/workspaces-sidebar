@@ -75,8 +75,9 @@ local function open(cx: WindowCx, tab_id: number, focus: boolean)
 end
 
 -- Ensures active tab in shown workspace has the sidebar mounted and synced
+-- `pinned` is unset on a fresh install; only an explicit `false` hides the rail.
 local function ensure_pinned(cx: WindowCx)
-	if not tern.kv.get("pinned") then
+	if tern.kv.get("pinned") == false then
 		return
 	end
 	model.deduplicate_sidebars(cx)
@@ -221,8 +222,8 @@ tern.command({
 	keys = { "cmd+alt+shift+b" },
 	run = function(cx)
 		local panes = mine(cx)
-		if tern.kv.get("pinned") or #panes > 0 then
-			tern.kv.set("pinned", nil)
+		if tern.kv.get("pinned") ~= false or #panes > 0 then
+			tern.kv.set("pinned", false)
 			for _, p in panes do
 				cx.layout:close(p)
 			end
