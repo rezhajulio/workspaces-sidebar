@@ -79,10 +79,7 @@ local function ensure_pinned(cx: WindowCx)
 	if not tern.kv.get("pinned") then
 		return
 	end
-	model.deduplicate_sidebars(cx)
-	model.auto_close_empty_tabs(cx)
 	model.restore_tab_colors(cx)
-
 	local cur_session = cx.sessions:current().id
 	local tr = layout_mod.target_ratio()
 	local focused = cx.session:focused()
@@ -619,11 +616,17 @@ end)
 
 
 -- Single cache lifetime per poll cycle; caches invalidated on any mutation
+local poll_counter = 0
+
 local function poll(cx: WindowCx?)
-	tern.timer(200, poll)
+	tern.timer(250, poll)
 	if cx then
-		model.invalidate() -- fresh read at cycle start
-		pcall(model.auto_close_empty_tabs, cx)
+		poll_counter = (poll_counter + 1) % 4
+		model.invalidate()
+		if poll_counter == 0 then
+			pcall(model.auto_close_empty_tabs, cx)
+			pcall(model.deduplicate_sidebars, cx)
+		end
 		pcall(ensure_pinned, cx)
 
 		-- Update the chrome snapshot for the pure status formatter
@@ -723,7 +726,6 @@ tern.on("focus", function(ev: any, cx: WindowCx)
 		end
 	end
 	model.invalidate()
-	pcall(model.auto_close_empty_tabs, cx)
 	pcall(ensure_pinned, cx)
 	pcall(refresh, cx)
 end)

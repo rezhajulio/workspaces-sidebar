@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.1.6] - 2026-10-25
+
+### Performance Improvements
+- **model**: memoize `collect_tab_flags` per cycle so fingerprint, build, and poll share a single query pass
+- **poll**: throttle tree layout scans for `auto_close_empty_tabs` and `deduplicate_sidebars` to 1-second intervals
+- **events**: remove redundant full-tree layout scans from the hot `focus` handler
+- **budget**: reduce total cycle duration from 36.6ms to 15.5ms, well within Tern's 50ms hook budget
+
 ## [0.1.5] - 2026-10-13
 
 ### Bug Fixes

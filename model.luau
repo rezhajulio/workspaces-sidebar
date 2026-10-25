@@ -7,10 +7,12 @@ local model = {}
 
 -- Per-cycle cache; window.luau invalidates at each cycle start / mutation
 local cache_panes: { number } = {}
+local cache_flags: { [number]: TabFlags }? = nil
 local cache_valid = false
 
 function model.invalidate()
 	cache_valid = false
+	cache_flags = nil
 end
 
 -- One canvas:list per cycle; every is_mine/tab_has_sidebar call hits the cache
@@ -135,6 +137,9 @@ export type TabFlags = {
 
 -- Per-tab status badges from panes + agent states (keyed by AgentBlock.pane, NOT .agent)
 function model.collect_tab_flags(cx: WindowCx): { [number]: TabFlags }
+	if cache_valid and cache_flags then
+		return cache_flags
+	end
 	local out: { [number]: TabFlags } = {}
 	local agent_map: { [number]: string } = {}
 	local ok_ag, agents = pcall(function() return cx.agents:list() end)
@@ -171,6 +176,7 @@ function model.collect_tab_flags(cx: WindowCx): { [number]: TabFlags }
 			end
 		end
 	end
+	cache_flags = out
 	return out
 end
 
