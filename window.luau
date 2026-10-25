@@ -21,6 +21,8 @@ local function mine(cx: WindowCx): { number }
 	return model.mine(cx)
 end
 
+local refresh_scheduled = false
+
 local function refresh(cx: WindowCx)
 	local panes = mine(cx)
 	if #panes == 0 then
@@ -38,6 +40,21 @@ local function refresh(cx: WindowCx)
 		end
 	end
 end
+
+local function schedule_refresh()
+	if refresh_scheduled then
+		return
+	end
+	refresh_scheduled = true
+	tern.timer(30, function(cx: WindowCx?)
+		refresh_scheduled = false
+		if cx then
+			model.invalidate()
+			pcall(refresh, cx)
+		end
+	end)
+end
+
 
 local function open(cx: WindowCx, tab_id: number, focus: boolean)
 	if opening then
@@ -658,28 +675,20 @@ tern.override("split_right", function(cx: WindowCx): boolean?
 	return nil
 end)
 
-tern.on("cwd", function(_ev: CwdEvent, cx: WindowCx)
-	last_fp = nil
-	model.invalidate()
-	pcall(refresh, cx)
+tern.on("cwd", function(_ev: CwdEvent, _cx: WindowCx)
+	schedule_refresh()
 end)
 
-tern.on("title", function(_ev: TitleEvent, cx: WindowCx)
-	last_fp = nil
-	model.invalidate()
-	pcall(refresh, cx)
+tern.on("title", function(_ev: TitleEvent, _cx: WindowCx)
+	schedule_refresh()
 end)
 
-tern.on("command_started", function(_ev: CommandStartedEvent, cx: WindowCx)
-	last_fp = nil
-	model.invalidate()
-	pcall(refresh, cx)
+tern.on("command_started", function(_ev: CommandStartedEvent, _cx: WindowCx)
+	schedule_refresh()
 end)
 
-tern.on("command_finished", function(_ev: CommandFinishedEvent, cx: WindowCx)
-	last_fp = nil
-	model.invalidate()
-	pcall(refresh, cx)
+tern.on("command_finished", function(_ev: CommandFinishedEvent, _cx: WindowCx)
+	schedule_refresh()
 end)
 
 tern.on("window_start", function(cx: WindowCx)
