@@ -6,10 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
-## [Unreleased]
+## [0.1.7] - 2026-10-25
 
 ### Bug Fixes
-- **pinned**: show the sidebar on a fresh install, as the README documents (`pinned` defaults to `true`). The rail was hidden until the first `Workspaces: toggle sidebar`, because an unset `pinned` key was read as off. Hiding now stores `false` instead of deleting the key. Users who had hidden the sidebar see it once more after this update.
+- **pinned**: show the sidebar on a fresh install, as the README documents (`pinned` defaults to `true`). The rail was hidden until the first `Workspaces: toggle sidebar`, because an unset `pinned` key was read as off. Hiding now stores `false` instead of deleting the key. Users who had hidden the sidebar see it once more after this update (#1, #2 by @ankitg12).
 
 ## [0.1.6] - 2026-10-25
 
