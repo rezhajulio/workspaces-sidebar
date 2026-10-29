@@ -29,6 +29,7 @@ function model.mine(cx: WindowCx): { number }
 		end
 	end
 	cache_panes = out
+	cache_valid = true
 	return out
 end
 
@@ -96,34 +97,18 @@ function model.auto_close_empty_tabs(cx: WindowCx)
 		return
 	end
 
-	for _, tab in cx.session:tabs() do
-		local l = cx.session:layout(tab.id)
-		if l and l.root then
-			local total = 0
-			local sidebar_count = 0
-			local sidebar_pane: number? = nil
+	local tab_panes_count: { [number]: number } = {}
+	for _, p in cx.session:panes() do
+		if p.tab then
+			tab_panes_count[p.tab] = (tab_panes_count[p.tab] or 0) + 1
+		end
+	end
 
-			local function count_leaves(tree: any)
-				if not tree then
-					return
-				end
-				if tree.pane then
-					total += 1
-					if model.is_mine(cx, tree.pane) then
-						sidebar_count += 1
-						sidebar_pane = tree.pane
-					end
-				end
-				count_leaves(tree[1])
-				count_leaves(tree[2])
-			end
-
-			count_leaves(l.root)
-
-			if total > 0 and total == sidebar_count and sidebar_pane then
-				cx.layout:close(sidebar_pane)
-				model.invalidate()
-			end
+	for _, sb_pane in model.mine(cx) do
+		local tab_id = cx.session:tab_of(sb_pane)
+		if tab_id and (tab_panes_count[tab_id] or 0) <= 1 then
+			cx.layout:close(sb_pane)
+			model.invalidate()
 		end
 	end
 end
@@ -137,7 +122,7 @@ export type TabFlags = {
 
 -- Per-tab status badges from panes + agent states (keyed by AgentBlock.pane, NOT .agent)
 function model.collect_tab_flags(cx: WindowCx): { [number]: TabFlags }
-	if cache_valid and cache_flags then
+	if cache_flags then
 		return cache_flags
 	end
 	local out: { [number]: TabFlags } = {}

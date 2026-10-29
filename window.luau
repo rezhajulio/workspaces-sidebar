@@ -14,6 +14,8 @@ local TITLE = "Workspaces"
 local HOME = tern.getenv("HOME") or ""
 local opening = false
 local last_fp: string?
+local pane_fp: { [number]: string } = {}
+local last_view: Node? = nil
 local tab_opening_times: { [number]: number } = {}
 
 
@@ -29,14 +31,47 @@ local function refresh(cx: WindowCx)
 		return
 	end
 	local fp = view_mod.fingerprint(cx)
-	if fp == last_fp then
+	local focused = cx.session:focused()
+	local active_tab = if focused then cx.session:tab_of(focused) else nil
+	local active_pane: number? = nil
+	if active_tab then
+		for _, p in panes do
+			if cx.session:tab_of(p) == active_tab then
+				active_pane = p
+				break
+			end
+		end
+	end
+
+	-- If global fingerprint changed, generate new view tree once
+	if fp ~= last_fp or not last_view then
+		last_fp = fp
+		local ok, v = pcall(view_mod.build, cx)
+		if ok and v then
+			last_view = v
+		end
+	end
+
+	if not last_view then
 		return
 	end
-	last_fp = fp
-	local ok, v = pcall(view_mod.build, cx)
-	if ok and v then
-		for _, pane in panes do
-			cx.canvas:set(pane, { view = v })
+
+	-- Update active pane immediately if stale
+	if active_pane and pane_fp[active_pane] ~= fp then
+		cx.canvas:set(active_pane, { view = last_view })
+		pane_fp[active_pane] = fp
+	end
+
+	-- Update at most 2 stale background panes per cycle to stay well under budget
+	local bg_updated = 0
+	for _, p in panes do
+		if p ~= active_pane and pane_fp[p] ~= fp then
+			cx.canvas:set(p, { view = last_view })
+			pane_fp[p] = fp
+			bg_updated += 1
+			if bg_updated >= 2 then
+				break
+			end
 		end
 	end
 end

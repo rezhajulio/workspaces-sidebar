@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.1.9] - 2026-10-29
+
+### Bug Fixes
+- **model**: set `cache_valid = true` after populating `model.mine` so per-cycle memoization actually activates across `is_mine` calls
+- **flags**: decouple `cache_flags` memoization check from `cache_valid` flag to eliminate redundant `cx.agents:list()` sweeps during `fingerprint` and `build`
+- **cleanup**: rewrite `auto_close_empty_tabs` from full-tree layout walks to pane-membership counts, reducing execution time from 23.8ms to 1.0ms
+- **render**: track per-pane fingerprints (`pane_fp`) and update active pane immediately while batching background panes, eliminating 50ms hook budget timeouts on multi-tab workspaces
+
 ## [0.1.8] - 2026-10-25
 
 ### Performance Improvements
