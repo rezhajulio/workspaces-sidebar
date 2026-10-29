@@ -85,6 +85,7 @@ local function schedule_refresh()
 		refresh_scheduled = false
 		if cx then
 			model.invalidate()
+			pcall(ensure_pinned, cx)
 			pcall(refresh, cx)
 		end
 	end)
@@ -770,7 +771,5 @@ tern.on("focus", function(ev: any, cx: WindowCx)
 			end
 		end
 	end
-	model.invalidate()
-	pcall(ensure_pinned, cx)
-	pcall(refresh, cx)
+	schedule_refresh()
 end)

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.1.10] - 2026-10-29
+
+### Performance Improvements
+- **events**: defer `ensure_pinned` and `refresh` in `tern.on("focus")` via `schedule_refresh`, eliminating 50ms hook budget timeouts during rapid tab switching
+
 ## [0.1.9] - 2026-10-29
 
 ### Bug Fixes
