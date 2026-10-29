@@ -45,7 +45,7 @@ To move a tab to another workspace, click its ⇥ badge. Every other badge hides
 
 The `+` on a workspace header opens a new tab in that workspace's directory. `+ Workspace` at the bottom creates a session named after your current folder and opens it there. If the name is taken, it dedups.
 
-To rename a workspace, click the `✎` icon on its header, or run `Workspaces: rename workspace` from the palette.
+To rename a workspace, click the `✎` icon on its header, or run `Workspaces: rename workspace` from the palette to open an inline prompt.
 
 `✕` closes a tab or an unlocked workspace. Accidental workspace closure is prevented by locking it with the 🔒/🔓 button.
 
@@ -91,6 +91,7 @@ Palette commands and keyboard shortcuts:
 | `Workspaces: go to 1` … `9` | `Cmd+Alt+1` … `9` | Jump directly to workspace 1 through 9 |
 | `Workspaces: new` | — | Create and seed a new workspace from current directory |
 | `Workspaces: rename workspace` | — | Prompt to rename the active workspace |
+| `Workspaces: move tab to workspace...` | — | Pick a target workspace for the focused tab |
 | `Workspaces: cycle active tab color` | — | Cycle through the 8 native tab colors on focused tab |
 | `Workspaces: toggle path style (smart / fish)` | — | Switch between smart basename and fish abbreviated paths |
 | `Workspaces: toggle color tags` | — | Show or hide colored dot indicators on tabs |

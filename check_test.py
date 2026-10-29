@@ -73,4 +73,16 @@ assert is_in_left_rail({"1": {"1": {"pane": 300}, "2": {"pane": sb}}, "2": {"pan
 assert not is_in_left_rail({"1": {"pane": 200}, "2": {"pane": sb}}, sb)  # displaced: sidebar in root[2]
 assert not is_in_left_rail({"1": {"pane": 200}, "2": {"1": {"pane": sb}, "2": {"pane": 300}}}, sb)  # displaced deep
 
+# Verify Tern 0.9.7 API wiring
+win_source = Path("tern-workspaces/window.luau").read_text()
+for needle in ('tern.on("agent_state"', 'tern.on("agent_finished"', 'tern.on("budget"', "cx:prompt(", "cx:pick("):
+    assert needle in win_source, f"missing {needle}"
+assert 'cx:command("rename_session")' not in win_source
+
+# Verify plugin.toml version matches latest CHANGELOG heading
+changelog = Path("tern-workspaces/CHANGELOG.md").read_text()
+latest_ver = re.search(r"## \[([0-9.]+)\]", changelog)
+assert latest_ver is not None, "latest changelog version not found"
+assert latest_ver.group(1) == manifest["version"], f"version mismatch: {latest_ver.group(1)} vs {manifest['version']}"
+
 print("ok")

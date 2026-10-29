@@ -2,6 +2,15 @@
 -- `tern plugin types DIR` writes this file into DIR; add its path to the
 -- `luau-lsp.types.definitionFiles` setting so `host.luau` and `window.luau` type-check.
 -- Members only one context has say `host only` or `window only` in their docs.
+--
+-- Budgets: every call into a plugin may run 2 s of Lua in the host half, 50 ms in the
+-- window half and 4 ms in chrome formatters and `available`; native calls (the `cx` API,
+-- `tern.fs`, `tern.kv`, starting a process, `require`'s compile) don't count, but a call
+-- may take at most ten budgets of wall time with them. A call past either raises
+-- `tern: <hook> exceeded <n> ms` and pauses that hook (every timer callback, say): 5 s, doubling
+-- for each trip within 10 min of the last pause's end, up to 5 min; due timer, process and fetch
+-- callbacks wait for the pause to end. Window halves hear `tern.on("budget")` as hooks pause and
+-- resume. A native call that never returns hangs its thread: in the window half, the window.
 
 --- `"host"` in `host.luau` (daemon side), `"window"` in `window.luau` (UI side).
 export type Context = "host" | "window"
@@ -609,10 +618,21 @@ export type AgentMessage = {
 	role: "user" | "assistant", text: string, tools: { { [string]: any } },
 }
 
---- Window only: agent conversations; targets are pane ids or session resolve specs.
+--- Window only: an agent block `cx.agents:get` found; it keeps working after the call that got it.
+export type Agent = {
+	--- Pane id.
+	pane: number,
+	--- Sends Carly `message` as a scheduled run when the agent's turn ends (done, failed, exited or
+	--- closed), once, within 12 hours; the task id cancels it (`tern.carly.cancel`).
+	tocarly: (self: Agent, event: "finished", message: string) -> number,
+}
+
+--- Window only: agent conversations; targets are pane ids, session resolve specs or `Agent` handles.
 declare extern type AgentsCx with
 	--- Synchronously lists agent blocks across all sessions, with progress/input state and last assistant text.
 	function list(self): { AgentBlock }
+	--- The agent block a pane id or resolve spec names; errors when none does or the pane runs no agent.
+	function get(self, agent: number | string): Agent
 	--- Synchronously opens an agent; the window retains prompt until its composer reports sendable=true.
 	--- Omitted command/how use agent settings; queued prompts survive a Carly/plugin VM reset.
 	--- cwd "~"/"~/…" expands using the launch host's home. Native omp requires TSP send.
@@ -623,18 +643,18 @@ declare extern type AgentsCx with
 	--- Synchronously queues/submits one prompt; native omp uses one atomic TSP send event.
 	--- Native prompts queue until sendable=true, even if already editable/focused; bootstrap false is not an error.
 	--- Blank/concurrent pending prompts or unsupported native omp error.
-	function ask(self, agent: number | string, text: string): ()
+	function ask(self, agent: number | string | Agent, text: string): ()
 	--- Desktop async: resolves with last assistant text when idle; timeout is ms (default 30000).
 	--- Queued/newly submitted prompts are not idle; delivery errors reject the awaitable.
 	--- Carly uses await(...); plugins use :next(function(message, err, cx) ... end).
-	function wait(self, agent: number | string, opts: { timeout: number? }?): Awaitable<string?>
+	function wait(self, agent: number | string | Agent, opts: { timeout: number? }?): Awaitable<string?>
 	--- Last messages in chronological order (default 50, max 1000); last=0 returns none.
 	--- Reads the omp.session TSP chat, excluding chrome/thinking; non-omp agents return {}.
-	function transcript(self, agent: number | string, opts: { last: number? }?): { AgentMessage }
+	function transcript(self, agent: number | string | Agent, opts: { last: number? }?): { AgentMessage }
 	--- Sends Ctrl-C to interrupt the current turn without closing its block.
-	function interrupt(self, agent: number | string): ()
+	function interrupt(self, agent: number | string | Agent): ()
 	--- Closes the agent block and ends its program, without an interactive confirmation.
-	function stop(self, agent: number | string): ()
+	function stop(self, agent: number | string | Agent): ()
 end
 
 --- A palette action, including unavailable commands and plugin registrations.
@@ -1104,6 +1124,36 @@ export type FocusEvent = {
 	pane: number,
 	--- Its tab id.
 	tab: number,
+}
+
+--- Window only: `agent_finished` payload: an agent's turn ended, or the agent did. A turn that ends while a
+--- prompt waits for the agent is not reported.
+export type AgentFinishedEvent = {
+	--- Pane id.
+	pane: number,
+	--- "done" or "failed" as it reported, "exited" when its program exited, "closed" when its block closed.
+	result: "done" | "failed" | "exited" | "closed",
+}
+
+--- Window only: `agent_state` payload: an agent's state, as `cx.agents:list()` gives it, changed.
+export type AgentStateEvent = {
+	--- Pane id.
+	pane: number,
+	--- Its state at the last look; nil for an agent new since.
+	old: ("working" | "waiting_input" | "idle" | "exited")?,
+	--- Its state now.
+	new: "working" | "waiting_input" | "idle" | "exited",
+}
+
+--- Window only: `budget` payload: one of this plugin's own hooks paused for running over its budget, or resumed.
+export type BudgetEvent = {
+	--- The hook: "timer", "command <id>", "status", an event name, ….
+	hook: string,
+	state: "paused" | "resumed",
+	--- The budget it ran over, in ms ("paused" only).
+	ms: number?,
+	--- How long it is paused, in ms ("paused" only).
+	paused_ms: number?,
 }
 
 --- Window only: `pane_created` / `pane_closed` payload.
@@ -1601,11 +1651,59 @@ declare extern type WindowCx with
 	function action(self, name: string): ()
 	--- Opens Carly and asks a shown question from a plugin callback.
 	function ask_carly(self, text: string): ()
+	--- Asks the user to choose one of `opts.items` in a picker over the focused pane; resolves with
+	--- the chosen item (the table passed in), nil when the user dismissed the picker.
+	function pick(self, opts: PickOptions): Awaitable<PickItem?>
+	--- Asks the user to type a line in a field over the focused pane; resolves with the text,
+	--- nil when the user dismissed it.
+	function prompt(self, opts: PromptOptions?): Awaitable<string?>
 	--- Shows a toast; `sub` is a secondary line.
 	function toast(self, level: ToastLevel, text: string, sub: string?): ()
 	--- Copies `text` to the clipboard.
 	function copy(self, text: string): ()
+	--- This window's key, as `tern … --window KEY` takes it and `tern inspect` lists it (`""` for the first
+	--- window). Processes `tern.process.run` starts in the window context get it as `TERN_WINDOW_KEY`.
+	function window_key(self): string
 end
+
+--- Window only: one choice of `cx:pick`. Other fields ride along to the answer.
+export type PickItem = {
+	--- What the row says; typing filters on it.
+	label: string,
+	--- Dim text after the label.
+	detail: string?,
+	--- Heading over a run of consecutive items with the same group.
+	group: string?,
+	--- A Tern icon name (default: the picker's icon).
+	icon: string?,
+	--- Shows a check: the current choice.
+	current: boolean?,
+	[string]: any,
+}
+
+--- Window only: what `cx:pick` asks.
+export type PickOptions = {
+	--- The choices, listed in this order; at least one.
+	items: { PickItem },
+	--- The empty field's hint, also the picker's accessible name.
+	placeholder: string?,
+	--- The field's Tern icon name (default `puzzle`).
+	icon: string?,
+	--- What ↵ does, in the key legend (default `select`).
+	action: string?,
+}
+
+--- Window only: what `cx:prompt` asks.
+export type PromptOptions = {
+	--- The text the field starts with, selected.
+	value: string?,
+	--- The empty field's hint, also the field's accessible name.
+	placeholder: string?,
+	--- The field's Tern icon name (default `puzzle`).
+	icon: string?,
+	--- What ↵ does, in the key legend (default `confirm`).
+	action: string?,
+}
 
 --- Desktop window only: durable Carly task. Exactly one of when/on is required.
 export type TaskSpec = {
@@ -1616,7 +1714,7 @@ export type TaskSpec = {
 	--- Intervals >= 5 minutes for model turns; >= 1 minute for promptless checks.
 	when: string?,
 	--- Window event: command_finished, command_started, pane_closed, pane_created,
-	--- tab_created, tab_closed, title, cwd or focus. Needs a check or pane.
+	--- tab_created, tab_closed, title, cwd, focus or agent_finished. Needs a check or pane.
 	on: string?,
 	--- Luau source returning function(ev, cx, state), never a saved closure.
 	--- nil is quiet; false ends the task; string/table escalates with prompt.
@@ -1774,6 +1872,8 @@ declare tern: {
 		--- Reads raw bytes (no UTF-8 check). With max_bytes, requires a regular
 		--- non-symlink file and rejects oversize input before allocating/reading it.
 		--- Raced growth is bounded too; nonregular targets never block on open.
+		--- Without max_bytes a FIFO or a stalled mount blocks until data comes, the window
+		--- half's UI thread included; no budget interrupts it.
 		read: (path: string, max_bytes: number?) -> string,
 		--- Writes `text` to a file, replacing it.
 		write: (path: string, text: string) -> (),
@@ -1790,6 +1890,7 @@ declare tern: {
 	--- Child processes on this context's machine.
 	process: {
 		--- Runs `argv`; without `cb` returns an awaitable, otherwise calls `cb` (window: plus a fresh `cx`); spawn failures raise. Raises on iOS.
+		--- The process starts on the calling thread (the UI thread in the window half) before this returns.
 		run: ((argv: { string }, opts: ProcessOptions?, cb: (result: ProcessResult, cx: WindowCx?) -> ()) -> ())
 			& ((argv: { string }, cb: (result: ProcessResult, cx: WindowCx?) -> ()) -> ())
 			& ((argv: { string }, opts: ProcessOptions?) -> Awaitable<ProcessResult>),
@@ -1905,7 +2006,8 @@ declare tern: {
 	--- Host: `spawn(spec: SpawnSpec) -> SpawnSpec?` (sync filter) and `(ev, cx: EffectCx)` for `command_started`,
 	--- `command_finished`, `cwd`, `title`, `pane_exited`. Window: `window_start(cx: WindowCx)` and `(ev, cx: WindowCx)`
 	--- for `focus`, `pane_created`, `pane_closed`, `tab_created`, `tab_closed`, `command_started`, `command_finished`, `cwd`,
-	--- `title` and `canvas_action(ev: CanvasAction, cx) -> boolean?` (truthy consumes the owner's click).
+	--- `title`, `agent_finished`, `agent_state` (AgentStateEvent), `budget` (BudgetEvent) and
+	--- `canvas_action(ev: CanvasAction, cx) -> boolean?` (truthy consumes the owner's click).
 	--- `window_start` runs once per plugin per window. The `spawn` wait (50 ms) counts from when the request is queued.
 	on: (name: string, fn: (...any) -> ...any) -> (),
 

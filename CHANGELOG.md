@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.1.11] - 2026-10-29
+
+### Features
+- **rename**: use native `cx:prompt` for workspace rename, updating sidebar and status line instantly without modal handover or session switching
+- **commands**: add `Workspaces: move tab to workspace...` command powered by native `cx:pick`
+- **events**: subscribe to `agent_state` and `agent_finished` to update agent status badges within 30ms in addition to polling
+- **telemetry**: subscribe to `budget` event to log plugin hook pause and resume transitions
+- **status**: return pre-allocated status segment in `tern.chrome.status` callback to eliminate garbage collection churn within the 4ms budget
+
 ## [0.1.10] - 2026-10-29
 
 ### Performance Improvements

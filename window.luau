@@ -76,6 +76,8 @@ local function refresh(cx: WindowCx)
 	end
 end
 
+local ensure_pinned: (cx: WindowCx) -> ()
+
 local function schedule_refresh()
 	if refresh_scheduled then
 		return
@@ -129,7 +131,7 @@ end
 
 -- Ensures active tab in shown workspace has the sidebar mounted and synced
 -- `pinned` is unset on a fresh install; only an explicit `false` hides the rail.
-local function ensure_pinned(cx: WindowCx)
+function ensure_pinned(cx: WindowCx)
 	if tern.kv.get("pinned") == false then
 		return
 	end
@@ -217,6 +219,69 @@ local function get_session_cwd(cx: WindowCx, session_id: number): string
 	end
 	return HOME
 end
+local function move_tab_to_session(cx: WindowCx, tab_id: number, session_id: number)
+	if session_id ~= cx.sessions:current().id then
+		cx.sessions:switch(session_id)
+	end
+	local l = cx.session:layout(tab_id)
+	if l and l.root then
+		local panes_to_move: { number } = {}
+		local function collect(t: TabTree?)
+			if not t then return end
+			if t.pane and not model.is_mine(cx, t.pane) then
+				table.insert(panes_to_move, t.pane)
+			end
+			collect(t[1])
+			collect(t[2])
+		end
+		collect(l.root)
+		for _, p in panes_to_move do
+			cx.layout:move_to_new_tab(p, session_id, { focus = false })
+		end
+	end
+end
+
+local function pick_move_target(cx: WindowCx, tab_id: number)
+	local cur_id = cx.sessions:current().id
+	local items: { PickItem } = {}
+	for _, s in cx.sessions:list() do
+		if s.id ~= cur_id then
+			local ntabs = s.tabs
+			table.insert(items, {
+				label = s.name,
+				detail = ntabs .. (if ntabs == 1 then " tab" else " tabs"),
+				icon = "sidebar",
+				session = s.id,
+			})
+		end
+	end
+	if #items == 0 then
+		cx:toast("info", "No other workspace to move to")
+		return
+	end
+	cx:pick({
+		items = items,
+		placeholder = "Move tab to workspace",
+		icon = "sidebar",
+		action = "move",
+	}):next(function(item: PickItem?, err: string?, ncx: WindowCx?)
+		if not ncx then
+			if err then
+				tern.log.warn("move pick failed:", err)
+			end
+			return
+		end
+		if err then
+			ncx:toast("error", "Move failed", err)
+			return
+		end
+		if not item then return end
+		model.invalidate()
+		pcall(move_tab_to_session, ncx, tab_id, item.session :: number)
+		last_fp = nil
+		pcall(refresh, ncx)
+	end)
+end
 
 local function step(cx: WindowCx, d: number)
 	local list = cx.sessions:list()
@@ -294,14 +359,6 @@ tern.command({ id = "new", title = "Workspaces: new", icon = "plus", run = funct
 	pcall(ensure_pinned, cx)
 	pcall(refresh, cx)
 end })
-tern.command({
-	id = "rename",
-	title = "Workspaces: rename workspace",
-	icon = "pencil",
-	run = function(cx)
-		cx:command("rename_session")
-	end,
-})
 tern.command({
 	id = "toggle_path_style",
 	title = "Workspaces: toggle path style (smart / fish)",
@@ -463,20 +520,97 @@ tern.command({
 	end,
 })
 
--- Native chrome status line segment (pure formatter, reads cached snapshot)
-local chrome_snapshot: ManagedSession? = nil
+-- Native chrome status line segment (pure formatter, zero allocation in callback)
+local cached_status_segments: { StatusSegment }? = nil
+local cached_status_name: string? = nil
+
+local function set_status_name(name: string)
+	if cached_status_name == name then
+		return
+	end
+	cached_status_name = name
+	cached_status_segments = {
+		{
+			text = " ▸ " .. name,
+			icon = "sidebar",
+			tone = "accent",
+			command = "plugin.workspaces-sidebar.toggle",
+		},
+	}
+	tern.chrome.refresh()
+end
+
+local function rename_workspace(cx: WindowCx, session_id: number)
+	local current_name = ""
+	for _, s in cx.sessions:list() do
+		if s.id == session_id then
+			current_name = s.name
+			break
+		end
+	end
+	cx:prompt({
+		value = current_name,
+		placeholder = "Workspace name",
+		icon = "pencil",
+		action = "rename",
+	}):next(function(text: string?, err: string?, ncx: WindowCx?)
+		if not ncx then
+			if err then
+				tern.log.warn("rename prompt failed:", err)
+			end
+			return
+		end
+		if err then
+			ncx:toast("error", "Rename failed", err)
+			return
+		end
+		if text == nil then
+			return
+		end
+		local name = string.match(text, "^%s*(.-)%s*$") or ""
+		if name == "" or name == current_name then
+			return
+		end
+		local ok, rerr = pcall(function()
+			ncx.sessions:rename(session_id, name)
+		end)
+		if not ok then
+			ncx:toast("error", "Rename failed", tostring(rerr))
+			return
+		end
+		if ncx.sessions:current().id == session_id then
+			set_status_name(name)
+		end
+		model.invalidate()
+		last_fp = nil
+		pcall(refresh, ncx)
+	end)
+end
+
+tern.command({
+	id = "rename",
+	title = "Workspaces: rename workspace",
+	icon = "pencil",
+	run = function(cx)
+		rename_workspace(cx, cx.sessions:current().id)
+	end,
+})
+
+tern.command({
+	id = "move_tab",
+	title = "Workspaces: move tab to workspace...",
+	icon = "sidebar",
+	run = function(cx)
+		local focused = cx.session:focused()
+		local tab_id = if focused then cx.session:tab_of(focused) else nil
+		if tab_id then
+			pick_move_target(cx, tab_id)
+		end
+	end,
+})
 
 tern.chrome.status(function(_pane: StatusPaneInfo): { StatusSegment }?
-	if not chrome_snapshot then
-		return nil
-	end
-	local seg: StatusSegment = {
-		text = " ▸ " .. chrome_snapshot.name,
-		icon = "sidebar",
-		tone = "accent",
-		command = "plugin.workspaces-sidebar.toggle",
-	}
-	return { seg }
+	return cached_status_segments
 end)
 
 tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
@@ -584,36 +718,13 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 		tern.kv.set("moving_tab", n)
 		cx:toast("info", "Pick a workspace to move this tab to")
 	elseif kind == "movehere" and n then
-		-- Move pending tab panes into this workspace
 		local moving = tern.kv.get("moving_tab")
 		if moving then
-			local cur_s = cx.sessions:current().id
-			if n ~= cur_s then
-				cx.sessions:switch(n)
-			end
-			local l = cx.session:layout(moving)
-			if l and l.root then
-				local panes_to_move = {}
-				local function collect(t: TabTree?)
-					if not t then return end
-					if t.pane and not model.is_mine(cx, t.pane) then
-						table.insert(panes_to_move, t.pane)
-					end
-					collect(t[1])
-					collect(t[2])
-				end
-				collect(l.root)
-				for _, p in panes_to_move do
-					cx.layout:move_to_new_tab(p, n, { focus = false })
-				end
-			end
+			move_tab_to_session(cx, moving, n)
 			tern.kv.set("moving_tab", nil)
 		end
 	elseif kind == "ren" and n then
-		if cx.sessions:current().id ~= n then
-			cx.sessions:switch(n)
-		end
-		cx:command("rename_session")
+		rename_workspace(cx, n)
 	elseif kind == "close" and n then
 		for _, s in cx.sessions:list() do
 			if s.id == n and not s.locked then
@@ -685,10 +796,8 @@ local function poll(cx: WindowCx?)
 
 		-- Update the chrome snapshot for the pure status formatter
 		local ok, cur = pcall(function() return cx.sessions:current() end)
-		local new_name = if ok and cur then cur.name else nil
-		if new_name and (not chrome_snapshot or chrome_snapshot.name ~= new_name) then
-			chrome_snapshot = cur
-			tern.chrome.refresh()
+		if ok and cur then
+			set_status_name(cur.name)
 		end
 
 		pcall(refresh, cx)
@@ -725,6 +834,22 @@ end)
 
 tern.on("command_finished", function(_ev: CommandFinishedEvent, _cx: WindowCx)
 	schedule_refresh()
+end)
+
+tern.on("agent_state", function(_ev: AgentStateEvent, _cx: WindowCx)
+	schedule_refresh()
+end)
+
+tern.on("agent_finished", function(_ev: AgentFinishedEvent, _cx: WindowCx)
+	schedule_refresh()
+end)
+
+tern.on("budget", function(ev: BudgetEvent, _cx: WindowCx)
+	if ev.state == "paused" then
+		tern.log.warn("workspaces-sidebar hook paused:", ev.hook, "budget ms:", ev.ms, "paused ms:", ev.paused_ms)
+	else
+		tern.log.info("workspaces-sidebar hook resumed:", ev.hook)
+	end
 end)
 
 tern.on("window_start", function(cx: WindowCx)
