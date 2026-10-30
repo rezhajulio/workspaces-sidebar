@@ -107,23 +107,47 @@ local function open(cx: WindowCx, tab_id: number, focus: boolean)
 
 	opening = true
 	pcall(function()
-		local active_tab = if cx.session:focused() then cx.session:tab_of(cx.session:focused()) else nil
-		local target = layout_mod.find_tab_terminal(cx, model.is_mine, tab_id) or cx.session:focused()
+		local focused = cx.session:focused()
+		local active_tab = if focused then cx.session:tab_of(focused) else nil
+		-- Split target: the tab's own terminal; else the focused pane when this is the active tab.
+		local split_target = layout_mod.find_tab_terminal(cx, model.is_mine, tab_id)
+			or (if active_tab == tab_id then focused else nil)
+		local dir: Dir? = if split_target then "left" else nil
+		local want = layout_mod.target_ratio()
+		-- Native placement (0.9.8): opens left of target at the saved width, no move/resize hops.
 		local pane, _err = cx.canvas:open({
 			title = TITLE,
 			about = "Workspaces Sidebar. Click workspace to switch, tab to focus, ✎ to rename, ✕ to close.",
 			view = view_mod.build(cx),
 			how = "beside",
 			focus = focus,
+			target = split_target,
+			dir = dir,
+			ratio = if split_target then want else nil,
 		})
-		if pane then
-			model.invalidate()
-			if active_tab == tab_id and target then
-				cx.layout:move(pane, target, "left", { focus = false })
-				layout_mod.match_ratio(cx, model.is_mine, pane, tab_id, layout_mod.target_ratio())
-			else
-				cx.layout:move_to_tab(pane, tab_id, { focus = false })
+		if not pane then
+			return
+		end
+		model.invalidate()
+
+		local l = cx.session:layout(tab_id)
+		local root = if l then l.root else nil
+		local placed = split_target ~= nil and root ~= nil and layout_mod.is_in_left_rail(root, pane)
+		if placed and root then
+			-- Record the opened ratio so focus/ensure_pinned don't read it as a user drag;
+			-- snap only if Tern clamped it away from the saved width.
+			local cur = root.ratio
+			if cur then
+				layout_mod.set_known_ratio(tab_id, cur)
+				if math.abs(cur - want) > 0.015 then
+					layout_mod.match_ratio(cx, model.is_mine, pane, tab_id, want)
+				end
 			end
+		elseif split_target and active_tab == tab_id then
+			cx.layout:move(pane, split_target, "left", { focus = false })
+			layout_mod.match_ratio(cx, model.is_mine, pane, tab_id, want)
+		elseif cx.session:tab_of(pane) ~= tab_id then
+			cx.layout:move_to_tab(pane, tab_id, { focus = false })
 		end
 	end)
 	opening = false
@@ -894,6 +918,22 @@ tern.on("focus", function(ev: any, cx: WindowCx)
 				end
 				layout_mod.set_known_ratio(tab_id, cur_r)
 			end
+		end
+	end
+	schedule_refresh()
+end)
+
+-- A session went away (closed here/elsewhere, `tern kill session`, end-on-success block).
+-- Drop its fold state and repaint now instead of waiting for the next poll.
+tern.on("session_ended", function(ev: SessionEndedEvent, cx: WindowCx)
+	tern.kv.set("fold_" .. ev.session, nil)
+	last_fp = nil
+	model.invalidate()
+	if ev.shown then
+		-- This window already shows a surviving session; refresh the status segment.
+		local ok, cur = pcall(function() return cx.sessions:current() end)
+		if ok and cur then
+			set_status_name(cur.name)
 		end
 	end
 	schedule_refresh()

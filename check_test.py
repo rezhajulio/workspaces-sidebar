@@ -86,3 +86,14 @@ assert latest_ver is not None, "latest changelog version not found"
 assert latest_ver.group(1) == manifest["version"], f"version mismatch: {latest_ver.group(1)} vs {manifest['version']}"
 
 print("ok")
+
+# Verify Tern 0.9.8 API wiring
+assert 'tern.on("session_ended"' in win_source, "missing session_ended"
+assert "SessionEndedEvent" in win_source
+assert 'tern.kv.set("fold_" .. ev.session, nil)' in win_source
+open_block = win_source[win_source.index("cx.canvas:open({"):]
+open_block = open_block[: open_block.index("})")]
+for needle in ("target = ", "dir = ", "ratio = "):
+    assert needle in open_block, f"canvas:open missing {needle}"
+assert 'dir: Dir? = if split_target then "left"' in win_source
+assert "layout_mod.target_ratio()" in open_block or "want" in open_block

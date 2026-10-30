@@ -39,24 +39,21 @@ Each workspace folds with its chevron. A collapsed workspace shows its tab count
 
 Tabs can carry color tags. Click the color badge to cycle through Tern's native tab colors: blue, green, yellow, orange, red, purple, teal, pink. Tags persist across restarts.
 
-To move a tab to another workspace, click its ⇥ badge. Every other badge hides, and you pick "Move here" on the target. Esc cancels. To reorder inside a workspace, shift-click a tab row to move it up, or alt-click to move it down.
-
+To move a tab to another workspace, click its ⇥ badge. Every other badge hides, and you pick "Move here" on the target (Esc cancels). Or run `Workspaces: move tab to workspace...` from the command palette to pick a target workspace via fuzzy picker. To reorder inside a workspace, shift-click a tab row to move it up, or alt-click to move it down.
 ### Creating and closing
 
 The `+` on a workspace header opens a new tab in that workspace's directory. `+ Workspace` at the bottom creates a session named after your current folder and opens it there. If the name is taken, it dedups.
 
-To rename a workspace, click the `✎` icon on its header, or run `Workspaces: rename workspace` from the palette to open an inline prompt.
+To rename a workspace, click the `✎` icon on its header, or run `Workspaces: rename workspace` from the palette to open an inline prompt. Renaming updates both the sidebar and status line instantly without switching your active workspace.
 
-`✕` closes a tab or an unlocked workspace. Accidental workspace closure is prevented by locking it with the 🔒/🔓 button.
+`✕` closes a tab or an unlocked workspace. Accidental workspace closure is prevented by locking it with the 🔒/🔓 button. When a session ends (from another window, `tern kill session`, or an `--end-on-success` block), its fold state is cleaned up and the sidebar redraws immediately.
 
 Press Ctrl+D in a shell and the tab closes cleanly. Without this, you get an orphaned sidebar sitting alone in a dead tab. Toggleable in settings.
-
 ### Layout and focus
 
-The sidebar mounts itself on every tab. Drag the divider once and every tab follows. The plugin calibrates against window width automatically.
+The sidebar mounts itself on every tab. On Tern 0.9.8+, it opens directly at your saved width using native canvas placement, without resize hops or visual flicker. Drag the divider once and every tab follows; the plugin calibrates against window width automatically.
 
-Focus behaves. Clicking around the sidebar never leaves focus stranded on it, and switching tabs restores the terminal focus of the tab you're going to.
-
+Focus behaves. Clicking around the sidebar never leaves focus stranded on it, and switching tabs restores the terminal focus of the tab you're going to. Rapid tab switching and focus changes are debounced so you never hit frame budget limits.
 Splitting panes respects the sidebar:
 - **Split down (`Shift+Cmd+D`)**: When focused on the sidebar, splits downward into the empty space below the `+ Workspace` button. Perfect for pinning an agent, task manager, or log monitor under the rail.
 - **Split right (`Cmd+D`)**: When focused on the sidebar, automatically redirects to the active terminal pane instead of splitting the rail into narrow, unreadable slivers.
@@ -133,12 +130,13 @@ Settings are persisted across Tern restarts via `tern.kv`:
 
 ## How it works, and what it can't do
 
-Tern's Luau API has no window-level sidebar. So the plugin mounts one pane per tab, automatically, and keeps their widths in sync. It looks like one sidebar. Under the hood it is many.
+Tern's Luau API has no window-level sidebar surface. So the plugin mounts one canvas pane per tab and keeps their widths in sync. It looks and feels like one sidebar. Under the hood it is many.
+
+Updates are event-driven: shell directory changes (`cwd`), command lifecycle (`command_started`/`command_finished`), agent status transitions (`agent_state`/`agent_finished`), and session teardown (`session_ended`) trigger debounced redraws within 30ms, backed by a 250ms polling loop for asynchronous state.
 
 Some things are stashed until Tern exposes the APIs they need: session notes and filter chips.
 
-Drag-and-drop reorder isn't possible, because canvas panes only receive clicks. That's why reordering uses modifier-click.
-
+Drag-and-drop reorder across tabs isn't possible, because canvas panes only receive clicks. That's why reordering uses modifier-click.
 ## Development
 
 ```sh
