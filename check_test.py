@@ -85,7 +85,6 @@ latest_ver = re.search(r"## \[([0-9.]+)\]", changelog)
 assert latest_ver is not None, "latest changelog version not found"
 assert latest_ver.group(1) == manifest["version"], f"version mismatch: {latest_ver.group(1)} vs {manifest['version']}"
 
-print("ok")
 
 # Verify Tern 0.9.8 API wiring
 assert 'tern.on("session_ended"' in win_source, "missing session_ended"
@@ -97,3 +96,9 @@ for needle in ("target = ", "dir = ", "ratio = "):
     assert needle in open_block, f"canvas:open missing {needle}"
 assert 'dir: Dir? = if split_target then "left"' in win_source
 assert "layout_mod.target_ratio()" in open_block or "want" in open_block
+
+# Verify Tern 0.9.9 API wiring
+view_source = Path("tern-workspaces/view.luau").read_text()
+assert "tern.ui.button(" in view_source, "missing tern.ui.button in view.luau"
+
+print("ok")

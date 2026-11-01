@@ -153,40 +153,45 @@ function view_mod.build(cx: WindowCx): Node
 		end
 
 		if not in_move_mode then
-			table.insert(header_cells, tern.ui.node("badge", {
+			table.insert(header_cells, tern.ui.button("+", {
 				key = "ws_add_" .. s.id,
-				text = "+",
-				tone = "muted",
+				variant = "quiet",
+				size = "sm",
+				title = "New tab in workspace directory",
 				actions = { click = "new_tab:" .. s.id },
 			}))
 
-			table.insert(header_cells, tern.ui.node("badge", {
+			table.insert(header_cells, tern.ui.button("✎", {
 				key = "ws_ren_" .. s.id,
-				text = "✎",
-				tone = "muted",
+				variant = "quiet",
+				size = "sm",
+				title = "Rename workspace",
 				actions = { click = "ren:" .. s.id },
 			}))
 
 			-- Interactive lock toggle
 			if s.locked then
-				table.insert(header_cells, tern.ui.node("badge", {
+				table.insert(header_cells, tern.ui.button("🔒", {
 					key = "ws_lock_" .. s.id,
-					text = "🔒",
-					tone = "warn",
+					variant = "quiet",
+					size = "sm",
+					title = "Locked: click to unlock",
 					actions = { click = "toggle_lock:" .. s.id },
 				}))
 			else
-				table.insert(header_cells, tern.ui.node("badge", {
+				table.insert(header_cells, tern.ui.button("🔓", {
 					key = "ws_lock_" .. s.id,
-					text = "🔓",
-					tone = "muted",
+					variant = "quiet",
+					size = "sm",
+					title = "Unlocked: click to lock",
 					actions = { click = "toggle_lock:" .. s.id },
 				}))
 				if #sessions > 1 then
-					table.insert(header_cells, tern.ui.node("badge", {
+					table.insert(header_cells, tern.ui.button("✕", {
 						key = "ws_del_" .. s.id,
-						text = "✕",
-						tone = "muted",
+						variant = "quiet",
+						size = "sm",
+						title = "Close workspace",
 						actions = { click = "close:" .. s.id },
 					}))
 				end
@@ -280,18 +285,20 @@ function view_mod.build(cx: WindowCx): Node
 						}))
 					end
 				else
-					table.insert(tab_cells, tern.ui.node("badge", {
+					table.insert(tab_cells, tern.ui.button("⇥", {
 						key = "tab_move_" .. t.id,
-						text = "⇥",
-						tone = "muted",
+						variant = "quiet",
+						size = "sm",
+						title = "Move tab to another workspace",
 						actions = { click = "move:" .. t.id },
 					}))
 
 					if #shown_tabs > 1 then
-						table.insert(tab_cells, tern.ui.node("badge", {
+						table.insert(tab_cells, tern.ui.button("✕", {
 							key = "tab_del_" .. t.id,
-							text = "✕",
-							tone = "muted",
+							variant = "quiet",
+							size = "sm",
+							title = "Close tab",
 							actions = { click = "close_tab:" .. t.id },
 						}))
 					end
@@ -307,19 +314,19 @@ function view_mod.build(cx: WindowCx): Node
 	table.insert(items, tern.ui.rule(""))
 	if in_move_mode then
 		table.insert(items, tern.ui.row({
-			tern.ui.node("badge", {
+			tern.ui.button("Cancel move (esc)", {
 				key = "cancel_move_ws",
-				text = "Cancel move (esc)",
-				tone = "warn",
+				variant = "danger",
+				size = "sm",
 				actions = { click = "cancel_move" },
 			}),
 		}))
 	else
 		table.insert(items, tern.ui.row({
-			tern.ui.node("badge", {
+			tern.ui.button("+ Workspace", {
 				key = "new_ws",
-				text = "+ Workspace",
-				tone = "accent",
+				variant = "default",
+				size = "sm",
 				actions = { click = "new" },
 			}),
 		}))
