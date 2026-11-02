@@ -100,5 +100,7 @@ assert "layout_mod.target_ratio()" in open_block or "want" in open_block
 # Verify Tern 0.9.9 API wiring
 view_source = Path("tern-workspaces/view.luau").read_text()
 assert "tern.ui.button(" in view_source, "missing tern.ui.button in view.luau"
+assert "action_buttons_enabled" in view_source, "missing action_buttons_enabled in view.luau"
+assert 'id = "toggle_action_buttons"' in win_source, "missing toggle_action_buttons in window.luau"
 
 print("ok")

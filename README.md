@@ -94,6 +94,7 @@ Palette commands and keyboard shortcuts:
 | `Workspaces: toggle color tags` | — | Show or hide colored dot indicators on tabs |
 | `Workspaces: toggle color tag labels` | — | Show or hide textual color names |
 | `Workspaces: toggle auto-close empty tabs` | — | Toggle whether Ctrl+D shell exit auto-closes the tab |
+| `Workspaces: toggle action buttons` | — | Show or hide interactive action buttons (+, ✎, 🔒, ✕, ⇥) |
 | Cancel move mode | `Esc` | Exit tab move mode |
 
 Mouse actions on the sidebar:
@@ -126,6 +127,7 @@ Settings are persisted across Tern restarts via `tern.kv`:
 | `color_labels_enabled` | `false` | Show textual color tag labels beside glyphs |
 | `auto_close_empty_tabs` | `true` | Auto-close orphaned tab when shell exits (Ctrl+D) |
 | `pinned` | `true` | Pinned sidebar rail visibility |
+| `action_buttons_enabled` | `true` | Show or hide action buttons (+, ✎, 🔒, ✕, ⇥) |
 | `sidebar_ratio` | dynamic | Divider width ratio, synced across tabs on drag |
 
 ## How it works, and what it can't do

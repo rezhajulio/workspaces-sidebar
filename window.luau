@@ -480,6 +480,22 @@ tern.command({
 		end
 	end,
 })
+tern.command({
+	id = "toggle_action_buttons",
+	title = "Workspaces: toggle action buttons",
+	icon = "sidebar",
+	run = function(cx)
+		local cur = tern.kv.get("action_buttons_enabled")
+		if cur == nil then
+			cur = true
+		end
+		local next_val = not cur
+		tern.kv.set("action_buttons_enabled", next_val)
+		cx:toast("info", "Action buttons: " .. (if next_val then "ON" else "OFF"))
+		last_fp = nil
+		refresh(cx)
+	end,
+})
 tern.command({ id = "next", title = "Workspaces: next", keys = { "cmd+alt+shift+]" }, run = function(cx) step(cx, 1) end })
 tern.command({ id = "prev", title = "Workspaces: previous", keys = { "cmd+alt+shift+[" }, run = function(cx) step(cx, -1) end })
 

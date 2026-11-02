@@ -47,6 +47,7 @@ function view_mod.fingerprint(cx: WindowCx): string
 	table.insert(parts, "style:" .. style)
 	table.insert(parts, "tags:" .. (if tern.kv.get("color_tags_enabled") == false then "0" else "1"))
 	table.insert(parts, "labels:" .. (if tern.kv.get("color_labels_enabled") == false then "0" else "1"))
+	table.insert(parts, "buttons:" .. (if tern.kv.get("action_buttons_enabled") == false then "0" else "1"))
 	table.insert(parts, "focus:" .. (active_tab or 0))
 	table.insert(parts, "ntabs:" .. #tabs)
 
@@ -83,6 +84,7 @@ function view_mod.build(cx: WindowCx): Node
 	local tab_flags = model.collect_tab_flags(cx)
 	local in_move_mode = (tern.kv.get("moving_tab") ~= nil)
 	local moving_tab = tern.kv.get("moving_tab")
+	local show_buttons = (tern.kv.get("action_buttons_enabled") ~= false)
 
 	for _, s in sessions do
 		local collapsed = model.is_session_collapsed(s.id, s.current)
@@ -152,7 +154,7 @@ function view_mod.build(cx: WindowCx): Node
 			}))
 		end
 
-		if not in_move_mode then
+		if show_buttons and not in_move_mode then
 			table.insert(header_cells, tern.ui.button("+", {
 				key = "ws_add_" .. s.id,
 				variant = "quiet",
@@ -284,7 +286,7 @@ function view_mod.build(cx: WindowCx): Node
 							actions = { click = "cancel_move" },
 						}))
 					end
-				else
+				elseif show_buttons then
 					table.insert(tab_cells, tern.ui.button("⇥", {
 						key = "tab_move_" .. t.id,
 						variant = "quiet",
@@ -321,7 +323,7 @@ function view_mod.build(cx: WindowCx): Node
 				actions = { click = "cancel_move" },
 			}),
 		}))
-	else
+	elseif show_buttons then
 		table.insert(items, tern.ui.row({
 			tern.ui.button("+ Workspace", {
 				key = "new_ws",
