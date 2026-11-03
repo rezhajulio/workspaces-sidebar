@@ -323,7 +323,7 @@ function view_mod.build(cx: WindowCx): Node
 				actions = { click = "cancel_move" },
 			}),
 		}))
-	elseif show_buttons then
+	else
 		table.insert(items, tern.ui.row({
 			tern.ui.button("+ Workspace", {
 				key = "new_ws",
