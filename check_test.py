@@ -104,4 +104,14 @@ assert "tern.ui.button(" in view_source, "missing tern.ui.button in view.luau"
 assert "action_buttons_enabled" in view_source, "missing action_buttons_enabled in view.luau"
 assert 'id = "toggle_action_buttons"' in win_source, "missing toggle_action_buttons in window.luau"
 
+# Verify Tern 0.9.35 native drag and drop wiring
+assert "drag = " in view_source, "missing drag container in view.luau"
+assert 'drag = "reorder_tab="' in view_source, "missing reorder_tab drag container in view.luau"
+assert "drop = " in view_source, "missing drop target in view.luau"
+assert 'drop = "move_tab_to_ws="' in view_source, "missing move_tab_to_ws drop target in view.luau"
+assert "reorder_tab" in win_source, "missing reorder_tab handler in window.luau"
+assert "move_tab_to_ws" in win_source, "missing move_tab_to_ws handler in window.luau"
+assert "order_tab(" in win_source, "missing order_tab call in window.luau"
+assert "move_to_new_tab(" in win_source, "missing move_to_new_tab call in window.luau"
+
 print("ok")

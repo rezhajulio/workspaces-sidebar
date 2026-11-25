@@ -657,7 +657,11 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 	if ev.owner ~= tern.plugin.id then
 		return nil
 	end
-	local kind, id = string.match(ev.act, "^([%a_]+):?(%d*)$")
+	-- Action names may carry a payload after `=` (drag/drop), which the host may or may not split.
+	local act_raw = ev.act or ""
+	local act_name = string.match(act_raw, "^([^=]*)") or act_raw
+	local act_payload = string.match(act_raw, "=(.*)$") or ""
+	local kind, id = string.match(act_name, "^([%a_]+):?(%d*)$")
 	local n = tonumber(id)
 
 	-- Cancel move mode via badge click
@@ -666,6 +670,67 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 		last_fp = nil
 		refresh(cx)
 		return true
+	end
+
+	-- Native drag: a tab row moved inside its workspace tab strip.
+	-- Release sends {id = <drag container>, act = "reorder_tab", item = <child id>, value = <0-based index>}.
+	if kind == "reorder_tab" then
+		local ev_any = ev :: any
+		local item = tostring(ev_any.item or "")
+		local node_id = tostring(ev.node or "")
+		if node_id == "" then
+			node_id = tostring(ev_any.id or "")
+		end
+		-- Child id carries the tab ("....tab_5"); act payload, if unsplit, carries the session.
+		local tab_id = tonumber(string.match(item, "tab_(%d+)"))
+			or tonumber(string.match(item, "(%d+)"))
+			or tonumber(string.match(node_id, "tab_(%d+)"))
+		local index = tonumber(ev.value)
+		if tab_id and index then
+			cx.layout:order_tab(tab_id, index + 1)
+			model.invalidate()
+			last_fp = nil
+			refresh(cx)
+			return true
+		end
+		return nil
+	end
+
+	-- Native drop: a tab row dropped on another workspace header row.
+	-- Release sends {id = <drop node>, act = "move_tab_to_ws", item = <child id>, value = "before"|"after"}.
+	if kind == "move_tab_to_ws" then
+		local ev_any = ev :: any
+		local item = tostring(ev_any.item or "")
+		local node_id = tostring(ev.node or "")
+		if node_id == "" then
+			node_id = tostring(ev_any.id or "")
+		end
+		local tab_id = tonumber(string.match(item, "tab_(%d+)"))
+			or tonumber(string.match(item, "(%d+)"))
+			or tonumber(string.match(node_id, "tab_(%d+)"))
+		local target_session = tonumber(string.match(node_id, "ws_head_(%d+)"))
+			or tonumber(string.match(act_payload, "(%d+)"))
+		if tab_id and target_session then
+			local pane = layout_mod.find_tab_terminal(cx, model.is_mine, tab_id)
+			if not pane then
+				for _, t in cx.session:tabs() do
+					if t.id == tab_id then
+						pane = t.pane
+						break
+					end
+				end
+			end
+			if pane then
+				cx.layout:move_to_new_tab(pane, target_session, { focus = false })
+			else
+				move_tab_to_session(cx, tab_id, target_session)
+			end
+			model.invalidate()
+			last_fp = nil
+			refresh(cx)
+			return true
+		end
+		return nil
 	end
 
 	local cur_focused = cx.session:focused()
