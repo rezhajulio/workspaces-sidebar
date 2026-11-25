@@ -653,6 +653,162 @@ tern.chrome.status(function(_pane: StatusPaneInfo): { StatusSegment }?
 	return cached_status_segments
 end)
 
+-- Native widget bar (Tern 0.9.35): render is a pure formatter (4 ms, no cx), so the
+-- snapshot and hover-card rows are built by the poll loop and read back here.
+local WIDGET_ID = "workspaces"
+local cached_widget: WidgetView? = nil
+local widget_fp: string? = nil
+
+local function clip(s: string, max: number): string
+	if #s <= max then
+		return s
+	end
+	return string.sub(s, 1, max)
+end
+
+local function session_tab_count(s: ManagedSession, fallback: number): number
+	local raw: any = s.tabs
+	if type(raw) == "number" then
+		return raw
+	elseif type(raw) == "table" then
+		return #raw
+	end
+	return fallback
+end
+
+local function update_widget(cx: WindowCx)
+	local ok_s, sessions = pcall(function()
+		return cx.sessions:list()
+	end)
+	if not ok_s or not sessions then
+		return
+	end
+	local ok_c, cur = pcall(function()
+		return cx.sessions:current()
+	end)
+	local cur_id = if ok_c and cur then cur.id else nil
+
+	-- Tabs of the shown session back up `ManagedSession.tabs` when it is absent.
+	local ok_t, tabs = pcall(function()
+		return cx.session:tabs()
+	end)
+	local live = 0
+	if ok_t and tabs then
+		for _, t in tabs do
+			if cur_id == nil or t.session == cur_id then
+				live += 1
+			end
+		end
+	end
+
+	local parts: { string } = {}
+	local rows: { WidgetCardRow } = {}
+	local current_name = if ok_c and cur then cur.name else ""
+	local cur_tabs = 0
+	for _, s in sessions do
+		local n = session_tab_count(s, if s.current then live else 0)
+		table.insert(parts, s.id .. ":" .. (if s.current then "1" else "0") .. ":" .. (s.locked and "L" or "U") .. ":" .. s.name .. ":" .. n)
+		if s.current then
+			if current_name == "" then
+				current_name = s.name
+			end
+			cur_tabs = n
+		end
+		if #rows < 32 then
+			local actions: { WidgetCardButton }? = nil
+			if not s.current then
+				actions = { { id = "switch", label = "Switch" } }
+			end
+			table.insert(rows, {
+				id = "ws-" .. s.id,
+				label = if s.current then "▸" else nil,
+				text = clip(s.name, 160) .. " · " .. n .. (if n == 1 then " tab" else " tabs"),
+				tone = if s.current then "accent" else "muted",
+				actions = actions,
+			})
+		end
+	end
+
+	local fp = table.concat(parts, "|")
+	if fp == widget_fp then
+		return
+	end
+	widget_fp = fp
+	cached_widget = {
+		text = clip(current_name, 120) .. " (" .. cur_tabs .. ")",
+		icon = "sidebar",
+		tone = "accent",
+		title = "Workspace " .. clip(current_name, 120) .. " · " .. cur_tabs .. (if cur_tabs == 1 then " tab" else " tabs"),
+		command = "plugin.workspaces-sidebar.toggle",
+		card = rows,
+	}
+	pcall(tern.chrome.refresh)
+end
+
+tern.chrome.widget(WIDGET_ID, {
+	name = "Workspaces",
+	description = "Current workspace & tab count",
+	icon = "sidebar",
+	styles = { "text" },
+	render = function(_pane: StatusPaneInfo?): WidgetView?
+		return cached_widget
+	end,
+})
+
+-- Hover-card buttons: each row id carries its session so the click switches workspace.
+tern.on("widget_action", function(ev: WidgetActionEvent, cx: WindowCx): boolean?
+	if ev.widget ~= WIDGET_ID then
+		return nil
+	end
+	local row = string.match(ev.row, "^ws%-(%d+)$")
+	if not row then
+		return nil
+	end
+	local id = tonumber(row)
+	if not id then
+		return nil
+	end
+	local target: ManagedSession? = nil
+	for _, s in cx.sessions:list() do
+		if s.id == id then
+			target = s
+			break
+		end
+	end
+	if not target then
+		return nil
+	end
+
+	if ev.act == "switch" or ev.act == "open" then
+		cx.sessions:switch(id)
+		last_fp = nil
+		model.invalidate()
+		pcall(ensure_pinned, cx)
+		pcall(refresh, cx)
+		pcall(update_widget, cx)
+		cx:toast("info", "Workspace: " .. target.name)
+		return true
+	elseif ev.act == "toggle" then
+		local panes = mine(cx)
+		if tern.kv.get("pinned") ~= false or #panes > 0 then
+			tern.kv.set("pinned", false)
+			for _, p in panes do
+				cx.layout:close(p)
+			end
+		else
+			tern.kv.set("pinned", true)
+			opening = false
+			last_fp = nil
+			pcall(ensure_pinned, cx)
+			pcall(refresh, cx)
+		end
+		model.invalidate()
+		pcall(update_widget, cx)
+		return true
+	end
+	return nil
+end)
+
 tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 	if ev.owner ~= tern.plugin.id then
 		return nil
@@ -840,6 +996,7 @@ local function poll(cx: WindowCx?)
 			set_status_name(cur.name)
 		end
 
+		pcall(update_widget, cx)
 		pcall(refresh, cx)
 	end
 end
@@ -897,6 +1054,7 @@ tern.on("window_start", function(cx: WindowCx)
 	model.invalidate()
 	pcall(ensure_pinned, cx)
 	pcall(refresh, cx)
+	pcall(update_widget, cx)
 end)
 
 tern.on("pane_closed", function(_ev: PaneEvent, cx: WindowCx)
