@@ -9,7 +9,7 @@ and [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 ## [0.2.0] - 2026-11-26
 
 ### Features
-- **dnd**: adopt native Tern 0.9.35 container `drag` and node `drop` for fluid tab reordering and inter-workspace tab transfers
+- **dnd**: adopt native Tern 0.9.35 container `drag` and node `drop` for fluid tab reordering and inter-workspace tab transfers; remove legacy modal `⇥` move button and `moving_tab` state machine
 - **motion**: add animated layout transitions with `transition = "layout"` and `motionKey` across workspace containers and tab rows
 - **widget**: register native top-bar widget via `tern.chrome.widget` with live tab counts, hover card, and direct switch actions
 - **layout**: listen to `canvas_resized` event to track manual divider resizing without timer polling drift

@@ -52,9 +52,7 @@ function view_mod.fingerprint(cx: WindowCx): string
 	table.insert(parts, "ntabs:" .. #tabs)
 
 	local tab_flags = model.collect_tab_flags(cx)
-	local moving = tern.kv.get("moving_tab")
 	local filt = tern.kv.get("tab_filter") or "all"
-	table.insert(parts, "moving:" .. (moving or 0))
 	table.insert(parts, "filter:" .. filt)
 
 	for _, s in cx.sessions:list() do
@@ -91,8 +89,6 @@ function view_mod.build(cx: WindowCx): Node
 	local focused_pane = cx.session:focused()
 	local current_tab_id = if focused_pane then cx.session:tab_of(focused_pane) else nil
 	local tab_flags = model.collect_tab_flags(cx)
-	local in_move_mode = (tern.kv.get("moving_tab") ~= nil)
-	local moving_tab = tern.kv.get("moving_tab")
 	local show_buttons = (tern.kv.get("action_buttons_enabled") ~= false)
 
 	for _, s in sessions do
@@ -154,16 +150,7 @@ function view_mod.build(cx: WindowCx): Node
 			}))
 		end
 
-		if in_move_mode then
-			table.insert(header_cells, tern.ui.node("badge", {
-				key = "ws_movehere_" .. s.id,
-				text = "Move here",
-				tone = "accent",
-				actions = { click = "movehere:" .. s.id },
-			}))
-		end
-
-		if show_buttons and not in_move_mode then
+		if show_buttons then
 			table.insert(header_cells, tern.ui.button("+", {
 				key = "ws_add_" .. s.id,
 				variant = "quiet",
@@ -244,7 +231,7 @@ function view_mod.build(cx: WindowCx): Node
 				local show_tag = tags_enabled ~= false
 				local labels_enabled = tern.kv.get("color_labels_enabled")
 				local show_label = labels_enabled ~= false
-				if not in_move_mode and show_tag and effective_color and color_info then
+				if show_tag and effective_color and color_info then
 					local tag_text = if show_label then color_info.glyph .. " " .. effective_color else color_info.glyph
 					table.insert(tab_cells, tern.ui.node("badge", {
 						key = "tab_col_" .. t.id,
@@ -252,7 +239,7 @@ function view_mod.build(cx: WindowCx): Node
 						tone = color_info.tone,
 						actions = { click = "color_tab:" .. t.id },
 					}))
-				elseif show_tag and not in_move_mode then
+				elseif show_tag then
 					table.insert(tab_cells, tern.ui.node("badge", {
 						key = "tab_col_" .. t.id,
 						text = "🏷",
@@ -294,33 +281,14 @@ function view_mod.build(cx: WindowCx): Node
 					end
 				end
 
-				if in_move_mode then
-					if moving_tab == t.id then
-						table.insert(tab_cells, tern.ui.node("badge", {
-							key = "tab_moving_" .. t.id,
-							text = "◀ moving (esc to cancel)",
-							tone = "accent",
-							actions = { click = "cancel_move" },
-						}))
-					end
-				elseif show_buttons then
-					table.insert(tab_cells, tern.ui.button("⇥", {
-						key = "tab_move_" .. t.id,
+				if show_buttons and #shown_tabs > 1 then
+					table.insert(tab_cells, tern.ui.button("✕", {
+						key = "tab_del_" .. t.id,
 						variant = "quiet",
 						size = "sm",
-						title = "Move tab to another workspace",
-						actions = { click = "move:" .. t.id },
+						title = "Close tab",
+						actions = { click = "close_tab:" .. t.id },
 					}))
-
-					if #shown_tabs > 1 then
-						table.insert(tab_cells, tern.ui.button("✕", {
-							key = "tab_del_" .. t.id,
-							variant = "quiet",
-							size = "sm",
-							title = "Close tab",
-							actions = { click = "close_tab:" .. t.id },
-						}))
-					end
 				end
 
 				local tab_row = tern.ui.row(tab_cells)
@@ -345,25 +313,14 @@ function view_mod.build(cx: WindowCx): Node
 	end
 
 	table.insert(items, tern.ui.rule(""))
-	if in_move_mode then
-		table.insert(items, tern.ui.row({
-			tern.ui.button("Cancel move (esc)", {
-				key = "cancel_move_ws",
-				variant = "danger",
-				size = "sm",
-				actions = { click = "cancel_move" },
-			}),
-		}))
-	else
-		table.insert(items, tern.ui.row({
-			tern.ui.button("+ Workspace", {
-				key = "new_ws",
-				variant = "default",
-				size = "sm",
-				actions = { click = "new" },
-			}),
-		}))
-	end
+	table.insert(items, tern.ui.row({
+		tern.ui.button("+ Workspace", {
+			key = "new_ws",
+			variant = "default",
+			size = "sm",
+			actions = { click = "new" },
+		}),
+	}))
 
 	local root = tern.ui.col(items)
 	root.p = { transition = "layout", transitionMs = 150 }

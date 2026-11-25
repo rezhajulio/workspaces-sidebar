@@ -627,15 +627,6 @@ for i = 1, 9 do
 	tern.bind("cmd+alt+" .. i, "plugin.workspaces-sidebar.goto_ws_" .. i)
 end
 
--- Esc cancels move mode (guarded: only acts when moving_tab is set)
-tern.bind("esc", function(cx: WindowCx)
-	if tern.kv.get("moving_tab") then
-		tern.kv.set("moving_tab", nil)
-		cx:toast("info", "Move cancelled")
-		last_fp = nil
-		refresh(cx)
-	end
-end)
 
 -- Attention jump command
 tern.command({
@@ -927,13 +918,6 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 	local kind, id = string.match(act_name, "^([%a_]+):?(%d*)$")
 	local n = tonumber(id)
 
-	-- Cancel move mode via badge click
-	if kind == "cancel_move" then
-		tern.kv.set("moving_tab", nil)
-		last_fp = nil
-		refresh(cx)
-		return true
-	end
 
 	-- Native drag: a tab row moved inside its workspace tab strip.
 	-- Release sends {id = <drag container>, act = "reorder_tab", item = <child id>, value = <0-based index>}.
@@ -1080,16 +1064,6 @@ tern.on("canvas_action", function(ev: CanvasAction, cx: WindowCx): boolean?
 				cx.layout:order_tab(n, t.position + 1)
 				break
 			end
-		end
-	elseif kind == "move" and n then
-		-- Enter move mode for this tab
-		tern.kv.set("moving_tab", n)
-		cx:toast("info", "Pick a workspace to move this tab to")
-	elseif kind == "movehere" and n then
-		local moving = tern.kv.get("moving_tab")
-		if moving then
-			move_tab_to_session(cx, moving, n)
-			tern.kv.set("moving_tab", nil)
 		end
 	elseif kind == "ren" and n then
 		rename_workspace(cx, n)
