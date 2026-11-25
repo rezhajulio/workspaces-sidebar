@@ -2,8 +2,9 @@ import re
 import tomllib
 from pathlib import Path
 
-# Verify plugin.toml
-manifest_path = Path("tern-workspaces/plugin.toml")
+# Base dir detection for repo root vs plugin dir / worktree
+base_dir = Path("tern-workspaces") if Path("tern-workspaces/plugin.toml").exists() else Path(".")
+manifest_path = base_dir / "plugin.toml"
 assert manifest_path.exists(), "manifest missing"
 manifest = tomllib.loads(manifest_path.read_text())
 assert manifest["id"] == "workspaces-sidebar"
@@ -74,13 +75,13 @@ assert not is_in_left_rail({"1": {"pane": 200}, "2": {"pane": sb}}, sb)  # displ
 assert not is_in_left_rail({"1": {"pane": 200}, "2": {"1": {"pane": sb}, "2": {"pane": 300}}}, sb)  # displaced deep
 
 # Verify Tern 0.9.7 API wiring
-win_source = Path("tern-workspaces/window.luau").read_text()
+win_source = (base_dir / "window.luau").read_text()
 for needle in ('tern.on("agent_state"', 'tern.on("agent_finished"', 'tern.on("budget"', "cx:prompt(", "cx:pick("):
     assert needle in win_source, f"missing {needle}"
 assert 'cx:command("rename_session")' not in win_source
 
 # Verify plugin.toml version matches latest CHANGELOG heading
-changelog = Path("tern-workspaces/CHANGELOG.md").read_text()
+changelog = (base_dir / "CHANGELOG.md").read_text()
 latest_ver = re.search(r"## \[([0-9.]+)\]", changelog)
 assert latest_ver is not None, "latest changelog version not found"
 assert latest_ver.group(1) == manifest["version"], f"version mismatch: {latest_ver.group(1)} vs {manifest['version']}"
@@ -98,7 +99,7 @@ assert 'dir: Dir? = if split_target then "left"' in win_source
 assert "layout_mod.target_ratio()" in open_block or "want" in open_block
 
 # Verify Tern 0.9.9 API wiring
-view_source = Path("tern-workspaces/view.luau").read_text()
+view_source = (base_dir / "view.luau").read_text()
 assert "tern.ui.button(" in view_source, "missing tern.ui.button in view.luau"
 assert "action_buttons_enabled" in view_source, "missing action_buttons_enabled in view.luau"
 assert 'id = "toggle_action_buttons"' in win_source, "missing toggle_action_buttons in window.luau"
