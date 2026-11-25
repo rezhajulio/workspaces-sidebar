@@ -133,4 +133,24 @@ match_fn = layout_source[layout_source.index("function layout_mod.match_ratio(")
 match_fn = match_fn[: match_fn.index("function layout_mod.known_ratio(")]
 assert 'tern.kv.set("sidebar_ratio"' not in match_fn, "match_ratio must not persist the target ratio"
 
+# Verify Tern 0.9.35 native widget bar wiring
+assert "tern.chrome.widget(WIDGET_ID" in win_source, "widget must register via WIDGET_ID"
+assert 'local WIDGET_ID = "workspaces"' in win_source, "missing WIDGET_ID constant"
+assert 'name = "Workspaces"' in win_source, "missing widget name"
+assert 'description = "Current workspace & tab count"' in win_source, "missing widget description"
+assert 'styles = { "text" }' in win_source, "missing widget styles"
+assert "render = function(_pane: StatusPaneInfo?): WidgetView?" in win_source, "missing widget render signature"
+assert 'tern.on("widget_action"' in win_source, "missing widget_action handler"
+assert "ev: WidgetActionEvent" in win_source, "widget_action must annotate WidgetActionEvent"
+assert 'command = "plugin.workspaces-sidebar.toggle"' in win_source, "missing widget click command"
+assert "card = rows" in win_source, "missing widget hover card rows"
+assert "WidgetCardRow" in win_source, "missing WidgetCardRow rows"
+assert "WidgetCardButton" in win_source, "missing WidgetCardButton actions"
+assert "pcall(update_widget, cx)" in win_source, "missing update_widget refresh wiring"
+assert "cached_widget" in win_source, "missing cached widget snapshot"
+
+# Widget contract bounds: card rows carry a session id and 32-row cap
+assert "^ws%-(%d+)$" in win_source, "row id must carry session id"
+assert "#rows < 32" in win_source, "card must cap at 32 rows"
+
 print("ok")
