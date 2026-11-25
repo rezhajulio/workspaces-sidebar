@@ -104,4 +104,11 @@ assert "tern.ui.button(" in view_source, "missing tern.ui.button in view.luau"
 assert "action_buttons_enabled" in view_source, "missing action_buttons_enabled in view.luau"
 assert 'id = "toggle_action_buttons"' in win_source, "missing toggle_action_buttons in window.luau"
 
+# Verify Tern 0.9.35 layout motion transitions
+assert 'transition = "layout"' in view_source, "missing layout transition in view.luau"
+assert "transitionMs = 150" in view_source, "missing transitionMs = 150 in view.luau"
+assert "motionKey" in view_source, "missing motionKey in view.luau"
+assert '"ws_" .. s.id' in view_source, "missing workspace motionKey in view.luau"
+assert '"tab_" .. t.id' in view_source, "missing tab motionKey in view.luau"
+
 print("ok")
