@@ -209,9 +209,17 @@ function view_mod.build(cx: WindowCx): Node
 			end
 		end
 
-		table.insert(items, motion_key(tern.ui.row(header_cells), "ws_" .. s.id))
+		-- Header row is a drop target: a tab dragged from any workspace tab strip lands here.
+		local header_row = tern.ui.row(header_cells)
+		local head_p: { [string]: any } = header_row.p or {}
+		head_p.key = "ws_head_" .. s.id
+		head_p.drop = "move_tab_to_ws=" .. s.id
+		head_p.motionKey = "ws_" .. s.id
+		header_row.p = head_p
+		table.insert(items, header_row)
 
 		if not collapsed then
+			local tab_rows: { Node } = {}
 			for i, t in shown_tabs do
 				local branch = if i == #shown_tabs then "  └─ " else "  ├─ "
 				local is_active = (t.id == current_tab_id)
@@ -315,8 +323,22 @@ function view_mod.build(cx: WindowCx): Node
 					end
 				end
 
-				table.insert(items, motion_key(tern.ui.row(tab_cells), "tab_" .. t.id))
+				local tab_row = tern.ui.row(tab_cells)
+				local row_p: { [string]: any } = tab_row.p or {}
+				-- Child id the drag reports as `item` on release.
+				row_p.key = "tab_" .. t.id
+				row_p.motionKey = "tab_" .. t.id
+				tab_row.p = row_p
+				table.insert(tab_rows, tab_row)
 			end
+
+			-- Container drag: reordering a tab row sends reorder_tab=<session> with item + 0-based index.
+			local strip = tern.ui.col(tab_rows)
+			local strip_p: { [string]: any } = strip.p or {}
+			strip_p.key = "tab_strip_" .. s.id
+			strip_p.drag = "reorder_tab=" .. s.id
+			strip.p = strip_p
+			table.insert(items, strip)
 		end
 
 		table.insert(items, tern.ui.node("text", { key = "sp_" .. s.id, text = " " }))

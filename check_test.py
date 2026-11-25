@@ -158,5 +158,14 @@ assert "transitionMs = 150" in view_source, "missing transitionMs = 150 in view.
 assert "motionKey" in view_source, "missing motionKey in view.luau"
 assert '"ws_" .. s.id' in view_source, "missing workspace motionKey in view.luau"
 assert '"tab_" .. t.id' in view_source, "missing tab motionKey in view.luau"
+# Verify Tern 0.9.35 native drag and drop wiring
+assert "drag = " in view_source, "missing drag container in view.luau"
+assert 'drag = "reorder_tab="' in view_source, "missing reorder_tab drag container in view.luau"
+assert "drop = " in view_source, "missing drop target in view.luau"
+assert 'drop = "move_tab_to_ws="' in view_source, "missing move_tab_to_ws drop target in view.luau"
+assert "reorder_tab" in win_source, "missing reorder_tab handler in window.luau"
+assert "move_tab_to_ws" in win_source, "missing move_tab_to_ws handler in window.luau"
+assert "order_tab(" in win_source, "missing order_tab call in window.luau"
+assert "move_to_new_tab(" in win_source, "missing move_to_new_tab call in window.luau"
 
 print("ok")
