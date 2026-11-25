@@ -104,4 +104,33 @@ assert "tern.ui.button(" in view_source, "missing tern.ui.button in view.luau"
 assert "action_buttons_enabled" in view_source, "missing action_buttons_enabled in view.luau"
 assert 'id = "toggle_action_buttons"' in win_source, "missing toggle_action_buttons in window.luau"
 
+# Verify Tern 0.9.35 canvas_resized wiring (sidebar width follows a manual divider drag)
+assert 'tern.on("canvas_resized"' in win_source, "missing canvas_resized listener"
+assert "CanvasResized" in win_source, "missing CanvasResized payload type"
+assert "function(ev: CanvasResized, cx: WindowCx)" in win_source, "missing canvas_resized handler signature"
+resized_block = win_source[win_source.index('tern.on("canvas_resized"'):]
+resized_block = resized_block[: resized_block.index("\nend)")]
+for needle in (
+    "ev.owner ~= tern.plugin.id",
+    "ev.sizes[1]",
+    "layout_mod.ratio_valid(",
+    "layout_mod.record_ratio(",
+    "layout_mod.set_known_ratio(tab_id, ratio)",
+    "schedule_ratio_sync(",
+):
+    assert needle in resized_block, f"canvas_resized handler missing {needle}"
+assert "snap_to_target(" in win_source, "missing programmatic snap guard"
+assert "sync_ratio_across_tabs(" in win_source, "missing cross-tab ratio sync"
+assert "syncing_ratios" in win_source, "missing own-resize guard"
+
+# layout.luau: ratio setters/getters stay separate from match_ratio's programmatic snaps
+layout_source = (base_dir / "layout.luau").read_text()
+assert "function layout_mod.ratio_valid(" in layout_source, "missing ratio_valid in layout.luau"
+assert "function layout_mod.record_ratio(" in layout_source, "missing record_ratio in layout.luau"
+assert "function layout_mod.set_known_ratio(" in layout_source, "missing set_known_ratio in layout.luau"
+assert "function layout_mod.match_ratio(" in layout_source, "missing match_ratio in layout.luau"
+match_fn = layout_source[layout_source.index("function layout_mod.match_ratio("):]
+match_fn = match_fn[: match_fn.index("function layout_mod.known_ratio(")]
+assert 'tern.kv.set("sidebar_ratio"' not in match_fn, "match_ratio must not persist the target ratio"
+
 print("ok")

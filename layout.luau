@@ -1,6 +1,9 @@
 --!strict
 -- Sidebar geometry: ratio memory, divider sync, tab terminal/close ops.
 
+local MIN_RATIO = 0.05
+local MAX_RATIO = 0.60
+local RATIO_TOLERANCE = 0.015
 local DEFAULT_RATIO = 0.16
 
 local layout_mod = {}
@@ -8,10 +11,30 @@ local tab_known_ratios: { [number]: number } = {}
 
 function layout_mod.target_ratio(): number
 	local r = tern.kv.get("sidebar_ratio")
-	if type(r) == "number" and r >= 0.05 and r <= 0.60 then
+	if type(r) == "number" and layout_mod.ratio_valid(r) then
 		return r
 	end
 	return DEFAULT_RATIO
+end
+
+-- True when `ratio` is a share the sidebar split can actually hold.
+-- `canvas_resized` reports one share per pane, so sizes[1] is checked through here.
+function layout_mod.ratio_valid(ratio: number?): boolean
+	if ratio == nil then
+		return false
+	end
+	return ratio >= MIN_RATIO and ratio <= MAX_RATIO
+end
+
+-- Persists a user-chosen sidebar width as the cross-tab target; nil when unusable.
+-- Only user drags (canvas_resized, focus fallback) come here: match_ratio snaps layouts
+-- programmatically and must never rewrite the target.
+function layout_mod.record_ratio(ratio: number?): number?
+	if ratio == nil or not layout_mod.ratio_valid(ratio) then
+		return nil
+	end
+	tern.kv.set("sidebar_ratio", ratio)
+	return ratio
 end
 
 -- Window VM exposes no cols; calibrate from observed resize deltas
@@ -48,7 +71,7 @@ function layout_mod.match_ratio(
 		end
 		local cur = l.root.ratio
 		local diff = target - cur
-		if math.abs(diff) < 0.015 then
+		if math.abs(diff) < RATIO_TOLERANCE then
 			break
 		end
 		local cells = math.floor(diff * cols + (if diff > 0 then 0.5 else -0.5))
@@ -68,16 +91,21 @@ function layout_mod.match_ratio(
 	end
 	local l_end = cx.session:layout(tab_id)
 	if l_end and l_end.root and l_end.root.ratio then
-		tab_known_ratios[tab_id] = l_end.root.ratio
+		layout_mod.set_known_ratio(tab_id, l_end.root.ratio)
 	end
 end
 
+-- What a tab's divider actually measures right now. Kept apart from `target_ratio`
+-- (the user's saved width): `match_ratio` writes here, so a plugin-driven snap is never
+-- later mistaken for a user drag by the focus/ensure_pinned fallbacks.
 function layout_mod.known_ratio(tab_id: number): number?
 	return tab_known_ratios[tab_id]
 end
 
 function layout_mod.set_known_ratio(tab_id: number, ratio: number)
-	tab_known_ratios[tab_id] = ratio
+	if layout_mod.ratio_valid(ratio) then
+		tab_known_ratios[tab_id] = ratio
+	end
 end
 
 -- True if pane is in the tab's left rail (root[1]), either alone or stacked with other blocks

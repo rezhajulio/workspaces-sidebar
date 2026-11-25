@@ -17,6 +17,8 @@ local last_fp: string?
 local pane_fp: { [number]: string } = {}
 local last_view: Node? = nil
 local tab_opening_times: { [number]: number } = {}
+-- True while this plugin moves dividers itself; ratio writes are then ignored, not user intent.
+local syncing_ratios = false
 
 
 local function mine(cx: WindowCx): { number }
@@ -77,6 +79,14 @@ local function refresh(cx: WindowCx)
 end
 
 local ensure_pinned: (cx: WindowCx) -> ()
+
+-- Sizes a tab's sidebar without letting the echo of our own divider moves register as a drag.
+local function snap_to_target(cx: WindowCx, pane: number, tab_id: number, target: number)
+	local was_syncing = syncing_ratios
+	syncing_ratios = true
+	layout_mod.match_ratio(cx, model.is_mine, pane, tab_id, target)
+	syncing_ratios = was_syncing
+end
 
 local function schedule_refresh()
 	if refresh_scheduled then
@@ -140,12 +150,12 @@ local function open(cx: WindowCx, tab_id: number, focus: boolean)
 			if cur then
 				layout_mod.set_known_ratio(tab_id, cur)
 				if math.abs(cur - want) > 0.015 then
-					layout_mod.match_ratio(cx, model.is_mine, pane, tab_id, want)
+					snap_to_target(cx, pane, tab_id, want)
 				end
 			end
 		elseif split_target and active_tab == tab_id then
 			cx.layout:move(pane, split_target, "left", { focus = false })
-			layout_mod.match_ratio(cx, model.is_mine, pane, tab_id, want)
+			snap_to_target(cx, pane, tab_id, want)
 		elseif cx.session:tab_of(pane) ~= tab_id then
 			cx.layout:move_to_tab(pane, tab_id, { focus = false })
 		end
@@ -196,19 +206,116 @@ function ensure_pinned(cx: WindowCx)
 				end
 				local cur_r = l.root.ratio
 				local prev_known = layout_mod.known_ratio(active_tab)
-				if prev_known and math.abs(cur_r - prev_known) > 0.015 and cur_r >= 0.05 and cur_r <= 0.60 then
-					tern.kv.set("sidebar_ratio", cur_r)
-					tr = cur_r
+				if prev_known and math.abs(cur_r - prev_known) > 0.015 then
+					-- Fallback drag detection for hosts without `canvas_resized`.
+					local recorded = layout_mod.record_ratio(cur_r)
+					if recorded then
+						tr = recorded
+					end
 				end
 				layout_mod.set_known_ratio(active_tab, cur_r)
-
 				if math.abs(cur_r - tr) > 0.015 then
-					layout_mod.match_ratio(cx, model.is_mine, pane, active_tab, tr)
+					snap_to_target(cx, pane, active_tab, tr)
 				end
 			end
 		end
 	end
 end
+
+-- Tern 0.9.35 `canvas_resized`: the user released a split divider (or reset it) in a canvas
+-- this plugin owns. `ev.sizes` holds one share per pane and sums to 1, so `sizes[1]` is the
+-- sidebar's share whenever the rail sits on the left of the split. That share is the user's
+-- intent, unlike the ratio `match_ratio` produces by snapping tabs to it.
+local ratio_sync_scheduled = false
+local ratio_sync_target: number? = nil
+local ratio_sync_skip: number? = nil
+
+-- Spread a new target width to the other tabs of the current session, cap 3 tabs per pass.
+-- `skip_tab` is the tab the user just dragged: Tern already sized it, so leave it alone.
+local function sync_ratio_across_tabs(cx: WindowCx, target: number, skip_tab: number?)
+	local ok, cur = pcall(function() return cx.sessions:current() end)
+	if not ok or not cur then
+		return
+	end
+	local moved = 0
+	for _, t in cx.session:tabs() do
+		if t.id ~= skip_tab and t.session == cur.id then
+			local has, pane = model.tab_has_sidebar(cx, t.id)
+			if has and pane then
+				local l = cx.session:layout(t.id)
+				if l and l.root and l.root.ratio and layout_mod.is_in_left_rail(l.root, pane) then
+					if math.abs(l.root.ratio - target) > 0.015 then
+						-- Record before snapping so focus/ensure_pinned read it as settled, not a drag.
+						layout_mod.set_known_ratio(t.id, target)
+						snap_to_target(cx, pane, t.id, target)
+						moved += 1
+						if moved >= 3 then
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+local function schedule_ratio_sync(cx: WindowCx)
+	if ratio_sync_scheduled then
+		return
+	end
+	ratio_sync_scheduled = true
+	local target = ratio_sync_target
+	local skip = ratio_sync_skip
+	-- Defer one frame: Tern finishes its own layout pass before we resize other tabs.
+	tern.timer(16, function(live: WindowCx?)
+		ratio_sync_scheduled = false
+		if live and target then
+			pcall(sync_ratio_across_tabs, live, target, skip)
+		end
+	end)
+end
+
+tern.on("canvas_resized", function(ev: CanvasResized, cx: WindowCx)
+	if ev.owner ~= tern.plugin.id then
+		return
+	end
+	if syncing_ratios then
+		return
+	end
+	local sizes = ev.sizes
+	if #sizes < 1 then
+		return
+	end
+	local ratio = ev.sizes[1]
+	if not layout_mod.ratio_valid(ratio) then
+		return
+	end
+	local pane = ev.pane
+	if not model.is_mine(cx, pane) then
+		return
+	end
+	local tab_id = cx.session:tab_of(pane)
+	if not tab_id then
+		return
+	end
+	-- Only the left-rail share measures sidebar width; a displaced rail reports it in sizes[2].
+	local l = cx.session:layout(tab_id)
+	if not l or not l.root or not layout_mod.is_in_left_rail(l.root, pane) then
+		return
+	end
+	if not layout_mod.record_ratio(ratio) then
+		return
+	end
+	layout_mod.set_known_ratio(tab_id, ratio)
+	-- Echo of a sync we already applied: adopt the width, don't fan out again.
+	local prev_target = ratio_sync_target
+	if prev_target and math.abs(prev_target - ratio) <= 0.015 then
+		return
+	end
+	ratio_sync_target = ratio
+	ratio_sync_skip = tab_id
+	schedule_ratio_sync(cx)
+end)
 
 -- Context inheritance helpers
 local function current_context(cx: WindowCx): (string, string)
@@ -929,8 +1036,8 @@ tern.on("focus", function(ev: any, cx: WindowCx)
 			if layout_mod.is_in_left_rail(l.root, sb_pane) then
 				local cur_r = l.root.ratio
 				local prev_known = layout_mod.known_ratio(tab_id)
-				if prev_known and math.abs(cur_r - prev_known) > 0.015 and cur_r >= 0.05 and cur_r <= 0.60 then
-					tern.kv.set("sidebar_ratio", cur_r)
+				if prev_known and math.abs(cur_r - prev_known) > 0.015 then
+					layout_mod.record_ratio(cur_r)
 				end
 				layout_mod.set_known_ratio(tab_id, cur_r)
 			end
