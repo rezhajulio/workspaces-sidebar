@@ -152,5 +152,11 @@ assert "cached_widget" in win_source, "missing cached widget snapshot"
 # Widget contract bounds: card rows carry a session id and 32-row cap
 assert "^ws%-(%d+)$" in win_source, "row id must carry session id"
 assert "#rows < 32" in win_source, "card must cap at 32 rows"
+# Verify Tern 0.9.35 layout motion transitions
+assert 'transition = "layout"' in view_source, "missing layout transition in view.luau"
+assert "transitionMs = 150" in view_source, "missing transitionMs = 150 in view.luau"
+assert "motionKey" in view_source, "missing motionKey in view.luau"
+assert '"ws_" .. s.id' in view_source, "missing workspace motionKey in view.luau"
+assert '"tab_" .. t.id' in view_source, "missing tab motionKey in view.luau"
 
 print("ok")

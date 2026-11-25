@@ -75,6 +75,15 @@ function view_mod.fingerprint(cx: WindowCx): string
 	return table.concat(parts, "|")
 end
 
+-- Tern 0.9.35 layout motion: descendants carrying a unique `motionKey` glide to
+-- their new places inside a container with `transition = "layout"`.
+local function motion_key(node: Node, key: string): Node
+	local props: { [string]: any } = node.p or {}
+	props.motionKey = key
+	node.p = props
+	return node
+end
+
 function view_mod.build(cx: WindowCx): Node
 	local items: { Node } = {}
 	local tabs = cx.session:tabs()
@@ -200,7 +209,7 @@ function view_mod.build(cx: WindowCx): Node
 			end
 		end
 
-		table.insert(items, tern.ui.row(header_cells))
+		table.insert(items, motion_key(tern.ui.row(header_cells), "ws_" .. s.id))
 
 		if not collapsed then
 			for i, t in shown_tabs do
@@ -306,7 +315,7 @@ function view_mod.build(cx: WindowCx): Node
 					end
 				end
 
-				table.insert(items, tern.ui.row(tab_cells))
+				table.insert(items, motion_key(tern.ui.row(tab_cells), "tab_" .. t.id))
 			end
 		end
 
@@ -334,7 +343,9 @@ function view_mod.build(cx: WindowCx): Node
 		}))
 	end
 
-	return tern.ui.col(items)
+	local root = tern.ui.col(items)
+	root.p = { transition = "layout", transitionMs = 150 }
+	return root
 end
 
 return view_mod
